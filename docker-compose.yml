@@ -1,0 +1,27 @@
+version: '2'
+services:
+
+  client:
+    image: kv511-client
+    container_name: kv511-client
+    ports:
+    - "54321:54321"
+    volumes:
+    - ./client-front:/root/kv511-client
+    tty: true
+
+  server-front:
+    image: kv511-server-front
+    container_name: kv511-server-front
+    ports:
+    - "56789:56789"
+    volumes:
+    - ./server-front:/root/kv511-server-front
+    tty: true
+
+  server-back:
+    image: kv511-server-back
+    container_name: kv511-server-back
+    volumes:
+    - ./server-back:/root/kv511-server-back
+    tty: true
