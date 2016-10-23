@@ -5,6 +5,9 @@ A key-value store implemented with a client-server model.
 - Docker (CLI preferred)
 - Make
 
+# About the JSON Parser
+JSON parser is a C++ library provided here: https://github.com/nlohmann/json
+
 # Developing and Testing
 Build and run the Docker containers, then you can use your preferred code editor to modify the program. The Docker containers link their internal volumes to the folders that contain our code, so we can make changes without having to rebuild and redeploy Docker - the changes take place instantly, and we can use g++ within the containers to build using the same configurations on both of our machines and the same configuration that will be used on production.
 
