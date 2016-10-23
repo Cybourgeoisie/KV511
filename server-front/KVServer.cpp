@@ -268,6 +268,28 @@ void KVServer::handleExistingConnections()
 
 		// Read the incoming message into the buffer
 		int message_size = read(sockets[i], buffer, INCOMING_MESSAGE_SIZE);
+		if (message_size > 1) {
+            //parse message and execute accordingly
+			nlohmann::json request = nlohmann::json::parse(buffer);
+            std::cout << request.dump(4) << std::endl;
+
+            if (request["type"] == "GET") {
+                std::cout << "received Get request";
+                
+            } else if (request["type"] == "POST") {
+                std::cout << "received POST request";
+                auto key = request["key"].get<std::string>();
+                auto value = request["value"].get<std::string>();
+                hashtable.emplace(key, value);
+            }
+            std::cout << "hashtable contains:";
+            for ( auto it = hashtable.begin(); it != hashtable.end(); ++it )
+                std::cout << " " << it->first << ":" << it->second;
+            std::cout << std::endl;
+
+
+            std::cout << request.dump(4) << std::endl;
+		}
 
 		// Handle a closed connection
 		if (message_size == 0)

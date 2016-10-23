@@ -16,7 +16,9 @@ class KVClientThread
 
         void sendMessageToSocket(string, int);
 
-	public:
+        string createRequestJson(string, string, string);
+
+public:
 		KVClientThread(KVConnectionDetails *);
 		void sendRequests();
 

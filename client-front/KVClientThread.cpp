@@ -25,9 +25,9 @@ void KVClientThread::sendRequests()
 		long i = 0;
 		while (1)
 		{
-            std::string message = std::string("Hello, I am ") + std::to_string(server_socket);
-            sendMessageToSocket(message, server_socket);
-            sleep(10);
+			string request = createRequestJson("POST", std::to_string(i), "World!");
+            sendMessageToSocket(request, server_socket);
+            sleep(5);
 			i += 1;
 		}
 	}
@@ -39,6 +39,14 @@ void KVClientThread::sendMessageToSocket(string request, int socket) {
         perror("Error: could not send message to server");
         exit(1);
     }
+}
+
+string KVClientThread::createRequestJson(string type, string key, string value) {
+	nlohmann::json request;
+	request["type"] = type;
+	request["key"] = key;
+	request["value"] = value;
+	return request.dump();
 }
 
 

@@ -2,6 +2,8 @@
 #define KVSERVER_H
 
 #include "../libs/KVCommon.cpp"
+//Hashtable
+#include <unordered_map>
 
 using namespace std;
 
@@ -41,6 +43,8 @@ class KVServer
 
 		// Socket descriptors used for select()
 		fd_set socket_descriptors;
+
+		unordered_map<string, string> hashtable;
 
 	public:
 		KVServer();
