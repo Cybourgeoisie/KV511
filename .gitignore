@@ -23,6 +23,9 @@
 *.a
 *.lib
 
+# Those crap folders
+*.dSYM
+
 # Executables
 *.exe
 *.out

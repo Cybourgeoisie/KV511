@@ -29,6 +29,9 @@
 // Multithreading
 #include <pthread.h>
 
+// JSON parsing support
+#include "json.hpp"
+
 using namespace std;
 
 typedef struct {
