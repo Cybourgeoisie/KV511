@@ -16,7 +16,6 @@ void KVClient::start(string address, int port, int spec_type, int thread_count)
 {
 	// Clear the screen to boot
 	KVCommon::clearScreen();
-
 	// Construct the connection details
 	KVConnectionDetails details;
 	details.address = address;

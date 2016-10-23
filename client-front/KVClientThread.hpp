@@ -14,9 +14,12 @@ class KVClientThread
 		int server_socket;
 		KVConnectionDetails * details;
 
+        void sendMessageToSocket(string, int);
+
 	public:
 		KVClientThread(KVConnectionDetails *);
 		void sendRequests();
+
 };
 
 #endif

@@ -25,9 +25,20 @@ void KVClientThread::sendRequests()
 		long i = 0;
 		while (1)
 		{
+            std::string message = std::string("Hello, I am ") + std::to_string(server_socket);
+            sendMessageToSocket(message, server_socket);
+            sleep(10);
 			i += 1;
 		}
 	}
+}
+
+void KVClientThread::sendMessageToSocket(string request, int socket) {
+    //write the message to the server socket
+    if (write(socket, request.c_str(), request.length()) < 0){
+        perror("Error: could not send message to server");
+        exit(1);
+    }
 }
 
 
