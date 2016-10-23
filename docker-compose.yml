@@ -10,6 +10,8 @@ services:
     - ./client-front:/root/client-front
     - ./libs:/root/libs
     tty: true
+    links:
+    - "server-front:server-front"
 
   server-front:
     image: kv511-server-front
@@ -20,6 +22,8 @@ services:
     - ./server-front:/root/server-front
     - ./libs:/root/libs
     tty: true
+    links:
+    - "server-back:server-back"
 
   server-back:
     image: kv511-server-back

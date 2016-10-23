@@ -8,7 +8,7 @@ class KVClientThread
 	private:
 		
 		// Make a connection to the server
-		void makeConnection(string, int);
+		bool makeConnection(string, int);
 
 		// Keep track of the server connection & details
 		int server_socket;

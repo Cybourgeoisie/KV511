@@ -17,13 +17,16 @@ KVClientThread::KVClientThread(KVConnectionDetails * conn_details)
 
 void KVClientThread::sendRequests()
 {
-	//makeConnection();
-	printf("Connecting to %s\t%d\n", details->address.c_str(), details->port);
-
-	long i = 0;
-	while (1)
+	// Make the connection - if not possible, thread will just exit
+	if (makeConnection(details->address, details->port))
 	{
-		i += 1;
+		cout << "Connection made." << endl;
+
+		long i = 0;
+		while (1)
+		{
+			i += 1;
+		}
 	}
 }
 
@@ -35,8 +38,11 @@ void KVClientThread::sendRequests()
 /**
  * Make a connection
  */
-void KVClientThread::makeConnection(string host, int port)
+bool KVClientThread::makeConnection(string host, int port)
 {
+	// Debug
+	printf("Connecting to %s:%d\n", details->address.c_str(), details->port);
+
 	struct sockaddr_in server_address;
 	struct hostent * server;
 
@@ -45,7 +51,7 @@ void KVClientThread::makeConnection(string host, int port)
 	if (server_socket < 0)
 	{
 		cout << "Error: could not open socket" << endl;
-		return;
+		return false;
 	}
 
 	// Find the server host
@@ -53,7 +59,7 @@ void KVClientThread::makeConnection(string host, int port)
 	if (server == NULL)
 	{
 		cout << "Error: could not find the host" << endl;
-		return;
+		return false;
 	}
 
 	// Clear out the server_address memory space
@@ -68,8 +74,10 @@ void KVClientThread::makeConnection(string host, int port)
 	if (connect(server_socket, (struct sockaddr *) &server_address, sizeof(server_address)) < 0) 
 	{
 		perror("Error: could not connect to host");
-		return;
+		return false;
 	}
+
+	return true;
 
 	cout << "Connected to server on port " << port << endl;
 }
