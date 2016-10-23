@@ -7,7 +7,8 @@ services:
     ports:
     - "54321:54321"
     volumes:
-    - ./client-front:/root/kv511-client
+    - ./client-front:/root/client-front
+    - ./libs:/root/libs
     tty: true
 
   server-front:
@@ -16,12 +17,14 @@ services:
     ports:
     - "56789:56789"
     volumes:
-    - ./server-front:/root/kv511-server-front
+    - ./server-front:/root/server-front
+    - ./libs:/root/libs
     tty: true
 
   server-back:
     image: kv511-server-back
     container_name: kv511-server-back
     volumes:
-    - ./server-back:/root/kv511-server-back
+    - ./server-back:/root/server-back
+    - ./libs:/root/libs
     tty: true
