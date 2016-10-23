@@ -252,6 +252,13 @@ void KVServer::handleNewConnectionRequest()
 	}
 }
 
+bool get_value(const string& key, string& value) {
+    auto t = hashtable.find(tag);
+    if (t == hashtable.end()) return false;
+    value = t->second;
+    return true;
+}
+
 void KVServer::handleExistingConnections()
 {
 	// Prepare the client address
@@ -272,13 +279,19 @@ void KVServer::handleExistingConnections()
             //parse message and execute accordingly
 			nlohmann::json request = nlohmann::json::parse(buffer);
             std::cout << request.dump(4) << std::endl;
+            auto key = request["key"].get<std::string>();
 
             if (request["type"] == "GET") {
                 std::cout << "received Get request";
-                
+                string value = string();
+                bool inTable = get_value(key, value);
+                if (bool == false) {
+
+                }
+
+
             } else if (request["type"] == "POST") {
                 std::cout << "received POST request";
-                auto key = request["key"].get<std::string>();
                 auto value = request["value"].get<std::string>();
                 hashtable.emplace(key, value);
             }
