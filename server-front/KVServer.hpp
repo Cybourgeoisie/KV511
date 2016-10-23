@@ -2,7 +2,9 @@
 #define KVSERVER_H
 
 #include "../libs/KVCommon.cpp"
-//Hashtable
+#include "KVServerThread.cpp"
+
+// Hashtable
 #include <unordered_map>
 
 using namespace std;
@@ -15,6 +17,7 @@ class KVServer
 		void resetSocketDescriptors();
 		void handleNewConnectionRequest();
 		void handleExistingConnections();
+		static void * startServerThread(void *);
 
 		// Own socket
 		void openSocket();

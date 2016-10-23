@@ -38,15 +38,14 @@ void KVServer::start()
 	listenForActivity();
 }
 
-/*
-void * KVServer::startActivityListenerThread(void * arg)
+void * KVServer::startServerThread(void * arg)
 {
-	KVServer * node;
-	node = (KVServer *) arg;
-	node->listenForActivity();
+	long socket_fd = (long) arg;
+
+	KVServerThread * thread = new KVServerThread(socket_fd);
+	thread->listenForActivity();
 	pthread_exit(NULL);
 }
-*/
 
 /**
  * Private Methods
@@ -136,13 +135,18 @@ void KVServer::listenForActivity()
 
 	while (true) 
 	{
-		cout << "... Listening for activity..." << endl;
+		cout << "... Listening for new connections on main thread..." << endl;
 
 		// Ready the socket descriptors
 		this->resetSocketDescriptors();
   
+		struct pollfd fds[1];
+
+		fds[0].fd     = primary_socket;
+		fds[0].events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLWRBAND;
+
 		// Wait for activity
-		int activity = select(max_connection + 1, &socket_descriptors, NULL, NULL, NULL);
+		int activity = poll(fds, 1, NULL);
 
 		// Validate the activity
 		if ((activity < 0) && (errno!=EINTR))
@@ -151,14 +155,7 @@ void KVServer::listenForActivity()
 			exit(1);
 		}
 
-		// Anything on the primary socket is a new connection
-		if (FD_ISSET(primary_socket, &socket_descriptors))
-		{
-			this->handleNewConnectionRequest();
-		}
-
-		// Perform any open activities on all other clients
-		this->handleExistingConnections();
+		this->handleNewConnectionRequest();
 	}
 }
 
@@ -245,6 +242,14 @@ void KVServer::handleNewConnectionRequest()
 		a_socket.name = "";
 		socket_vector.push_back(a_socket);
 
+		// Spawn the new thread
+		pthread_t node_thread;
+		if (pthread_create(&node_thread, NULL, &KVServer::startServerThread, (void *) new_socket) != 0)
+		{
+			perror("Error: could not spawn peer listeners");
+			exit(1);
+		}
+
 		// Keep track of the last update to the sockets
 		gettimeofday(&sockets_last_modified, NULL);
 
@@ -326,6 +331,7 @@ void KVServer::handleExistingConnections()
 
 				Not real sure how we'll accomplish that yet.
 			*/
+
 		}
 	}
 }
