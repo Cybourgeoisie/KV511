@@ -17,6 +17,9 @@ class KVServerThread
 		// Buffer
 		char * buffer;
 
+		// Messages
+		string createResponseJson(string, string, string, int);
+
 	public:
 		KVServerThread(int);
 

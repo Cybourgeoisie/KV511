@@ -8,4 +8,4 @@ server: server.cpp
 	$(CXX) -g -pthread -std=c++0x server.cpp -o server.o
 
 clean:
-	$(RM) server.o
+	$(RM) -r server.o server.o.dSYM

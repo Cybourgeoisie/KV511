@@ -1,11 +1,8 @@
 #ifndef KVSERVER_H
 #define KVSERVER_H
 
-#include "../libs/KVCommon.cpp"
-#include "KVServerThread.cpp"
-
-// Hashtable
-#include <unordered_map>
+#include "../libs/KVCommon.hpp"
+#include "KVServerThread.hpp"
 
 using namespace std;
 
@@ -47,11 +44,6 @@ class KVServer
 		// Socket descriptors used for select()
 		fd_set socket_descriptors;
 
-		unordered_map<string, string> hashtable;
-
-		bool get_value(const string&, string&);
-        bool createResponseJson(string, string, string, int);
-
 public:
 		KVServer();
 		void start();
@@ -61,6 +53,8 @@ public:
 		void closeSocket(int);
 		void queueSocketToClose(int);
 
+		// Our KV cache
+		static KVCache * cache;
 
 };
 

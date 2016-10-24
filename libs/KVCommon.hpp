@@ -10,6 +10,7 @@
 #include <vector>
 #include <map>
 #include <algorithm>
+#include <unordered_map>
 #include <fstream>
 #include <sstream>
 #include <sys/types.h>
@@ -33,12 +34,15 @@
 // JSON parsing support
 #include "json.hpp"
 
+// Our local cache
+#include "KVCache.cpp"
+
 using namespace std;
 
 typedef struct {
-	unsigned int socket_id;
-	string type;
-	string name;
+	unsigned int socket_fd;
+	bool active;
+	void * cache_address;
 } KVSocket;
 
 typedef struct {

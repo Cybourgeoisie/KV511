@@ -19,6 +19,7 @@ KVServerThread::KVServerThread(int socket_number)
 
 	// Keep track of the current socket number
 	socket_fd = socket_number;
+	printf("Socket number: %d\n", socket_fd);
 }
 
 void KVServerThread::start()
@@ -62,7 +63,35 @@ void KVServerThread::listenForActivity()
 			// Read what happened, if anything
 			if (message_size > 0)
 			{
-				cout << buffer << endl;
+				//parse message and execute accordingly
+				nlohmann::json request = nlohmann::json::parse(buffer);
+				std::cout << request.dump(4) << std::endl;
+				auto key = request["key"].get<std::string>();
+				auto requestType = request["type"].get<std::string>();
+				string response;
+				if (requestType == "GET") {
+					std::cout << "received Get request";
+					string value = string();
+
+					bool inTable = KVServer::cache->get_value(key, value);
+					if (inTable == false) {
+						response = createResponseJson("GET", key, "", 404);
+						cout << "Key Not Found.";
+					} else {
+						response = createResponseJson("GET", key, value, 200);
+						cout << value;
+					}
+
+				} else if (requestType == "POST") {
+					std::cout << "received POST request";
+					auto value = request["value"].get<std::string>();
+					
+					bool success = KVServer::cache->post_value(key, value);
+
+					response = createResponseJson("POST", key, value, 200);
+				}
+
+				KVServer::cache->print_contents();
 			}
 			else
 			{
@@ -77,3 +106,17 @@ void KVServerThread::listenForActivity()
 		}
 	}
 }
+
+/**
+ * Sending and receiving messages
+ */
+
+string KVServerThread::createResponseJson(string type, string key, string value, int code) {
+    nlohmann::json response;
+    response["type"] = type;
+    response["key"] = key;
+    response["value"] = value;
+    response["code"] = code;
+    return response.dump();
+}
+

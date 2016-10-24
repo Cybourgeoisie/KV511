@@ -3,10 +3,14 @@
  */
 
 #include "KVServer.hpp"
+#include "../libs/KVCommon.cpp"
+#include "KVServerThread.cpp"
 
 /**
  * Public Methods
  */
+
+KVCache * KVServer::cache = new KVCache();
 
 KVServer::KVServer()
 {
@@ -40,9 +44,7 @@ void KVServer::start()
 
 void * KVServer::startServerThread(void * arg)
 {
-	long socket_fd = (long) arg;
-
-	KVServerThread * thread = new KVServerThread(socket_fd);
+	KVServerThread * thread = new KVServerThread((long) arg);
 	thread->listenForActivity();
 	pthread_exit(NULL);
 }
@@ -104,8 +106,8 @@ void KVServer::openSocket()
 	}
 
 	KVSocket a_socket;
-	a_socket.socket_id = primary_socket;
-	a_socket.type = "primary";
+	a_socket.socket_fd = primary_socket;
+	a_socket.active    = true;
 	socket_vector.push_back(a_socket);
 
 	// Keep track of the last update to the sockets
@@ -139,9 +141,9 @@ void KVServer::listenForActivity()
 
 		// Ready the socket descriptors
 		this->resetSocketDescriptors();
-  
-		struct pollfd fds[1];
 
+		// Listen only on the primary socket
+		struct pollfd fds[1];
 		fds[0].fd     = primary_socket;
 		fds[0].events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLWRBAND;
 
@@ -155,9 +157,11 @@ void KVServer::listenForActivity()
 			exit(1);
 		}
 
+		// Handle a new connection
 		this->handleNewConnectionRequest();
 	}
 }
+
 
 /**
  * Handle Connection Activity
@@ -237,9 +241,8 @@ void KVServer::handleNewConnectionRequest()
 		sockets[i] = new_socket;
 
 		KVSocket a_socket;
-		a_socket.socket_id = new_socket;
-		a_socket.type = "client";
-		a_socket.name = "";
+		a_socket.socket_fd = new_socket;
+		a_socket.active    = true;
 		socket_vector.push_back(a_socket);
 
 		// Spawn the new thread
@@ -257,107 +260,10 @@ void KVServer::handleNewConnectionRequest()
 	}
 }
 
-bool KVServer::get_value(const string& key, string& value) {
-    auto t = hashtable.find(key);
-    if (t == hashtable.end()) return false;
-    value = t->second;
-    return true;
-}
-
-string KVServer::createResponseJson(string type, string key, string value, int code) {
-    nlohmann::json response;
-    response["type"] = type;
-    response["key"] = key;
-    response["value"] = value;
-    response["code"] = code;
-    return response.dump();
-}
-
-void KVServer::handleExistingConnections()
-{
-	// Prepare the client address
-	struct sockaddr_in client_address;
-	socklen_t client_address_length = sizeof(client_address);
-
-	// Iterate over all clients
-	for (int i = 0; i < MAX_CONNECTIONS; i++) 
-	{
-		if (!FD_ISSET(sockets[i], &socket_descriptors)) continue;
-
-		// Clear out the buffer
-		memset(&buffer[0], 0, BUFFER_SIZE);
-
-		// Read the incoming message into the buffer
-		int message_size = read(sockets[i], buffer, INCOMING_MESSAGE_SIZE);
-		if (message_size > 1) {
-            //parse message and execute accordingly
-			nlohmann::json request = nlohmann::json::parse(buffer);
-            std::cout << request.dump(4) << std::endl;
-            auto key = request["key"].get<std::string>();
-            auto requestType = request["type"].get<std::string>();
-            string response;
-            if (requestType == "GET") {
-                std::cout << "received Get request";
-                string value = string();
-                bool inTable = get_value(key, value);
-                if (inTable == false) {
-                    response = createResponseJson("GET", key, "", 404);
-					cout << "Key Not Found.";
-                } else {
-                    response = createResponseJson("GET", key, value, 200);
-					cout << value;
-				}
-            } else if (requestType == "POST") {
-                std::cout << "received POST request";
-                auto value = request["value"].get<std::string>();
-                hashtable[key] =  value;
-                response = createResponseJson("POST", key, value, 200);
-            }
-
-            std::cout << "hashtable contains:";
-            for ( auto it = hashtable.begin(); it != hashtable.end(); ++it )
-                std::cout << " " << it->first << ":" << it->second;
-            std::cout << std::endl;
-
-
-            std::cout << request.dump(4) << std::endl;
-		}
-
-		// Handle a closed connection
-		if (message_size == 0)
-		{
-			// Report the disconnection
-			getpeername(sockets[i], (struct sockaddr*)&client_address, &client_address_length);
-			cout << "Connection closed: " << inet_ntoa(client_address.sin_addr) << ":" << ntohs(client_address.sin_port) << endl;
-
-			// Close and free the socket
-			//queueSocketToClose(sockets[i]);
-			closeSocket(sockets[i]);
-		}
-		else
-		{
-			/*
-				If we had a single thread, we'd handle requests here
-				So maybe we'll handle async requests here?
-
-				Otherwise, if we're using MT, we need to handle all
-				incoming and outgoing communications on the threads.
-
-				Not real sure how we'll accomplish that yet.
-			*/
-
-		}
-	}
-}
 
 /**
  * Handle closing sockets
  */
-
-void KVServer::queueSocketToClose(int socket_id)
-{
-	sockets_to_close.push_back(socket_id);
-}
 
 void KVServer::closeSocket(int socket)
 {
@@ -365,7 +271,7 @@ void KVServer::closeSocket(int socket)
 	vector<KVSocket>::iterator iter;
 	for (iter = socket_vector.begin(); iter != socket_vector.end(); )
 	{
-		if (iter->socket_id == socket)
+		if (iter->socket_fd == socket)
 			iter = socket_vector.erase(iter);
 		else
 			++iter;
