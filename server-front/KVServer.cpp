@@ -257,11 +257,20 @@ void KVServer::handleNewConnectionRequest()
 	}
 }
 
-bool get_value(const string& key, string& value) {
-    auto t = hashtable.find(tag);
+bool KVServer::get_value(const string& key, string& value) {
+    auto t = hashtable.find(key);
     if (t == hashtable.end()) return false;
     value = t->second;
     return true;
+}
+
+string KVServer::createResponseJson(string type, string key, string value, int code) {
+    nlohmann::json response;
+    response["type"] = type;
+    response["key"] = key;
+    response["value"] = value;
+    response["code"] = code;
+    return response.dump();
 }
 
 void KVServer::handleExistingConnections()
@@ -285,21 +294,26 @@ void KVServer::handleExistingConnections()
 			nlohmann::json request = nlohmann::json::parse(buffer);
             std::cout << request.dump(4) << std::endl;
             auto key = request["key"].get<std::string>();
-
-            if (request["type"] == "GET") {
+            auto requestType = request["type"].get<std::string>();
+            string response;
+            if (requestType == "GET") {
                 std::cout << "received Get request";
                 string value = string();
                 bool inTable = get_value(key, value);
-                if (bool == false) {
-
-                }
-
-
-            } else if (request["type"] == "POST") {
+                if (inTable == false) {
+                    response = createResponseJson("GET", key, "", 404);
+					cout << "Key Not Found.";
+                } else {
+                    response = createResponseJson("GET", key, value, 200);
+					cout << value;
+				}
+            } else if (requestType == "POST") {
                 std::cout << "received POST request";
                 auto value = request["value"].get<std::string>();
-                hashtable.emplace(key, value);
+                hashtable[key] =  value;
+                response = createResponseJson("POST", key, value, 200);
             }
+
             std::cout << "hashtable contains:";
             for ( auto it = hashtable.begin(); it != hashtable.end(); ++it )
                 std::cout << " " << it->first << ":" << it->second;

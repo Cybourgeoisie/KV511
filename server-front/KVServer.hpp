@@ -49,7 +49,10 @@ class KVServer
 
 		unordered_map<string, string> hashtable;
 
-	public:
+		bool get_value(const string&, string&);
+        bool createResponseJson(string, string, string, int);
+
+public:
 		KVServer();
 		void start();
 		void listenForActivity();
