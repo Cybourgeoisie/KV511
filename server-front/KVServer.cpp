@@ -11,6 +11,7 @@
  */
 
 KVCache * KVServer::cache = new KVCache();
+vector<int> KVServer::sockets_to_close;
 
 KVServer::KVServer()
 {
@@ -18,12 +19,12 @@ KVServer::KVServer()
 	PORT_NUMBER = 56789;
 
 	// Define server limits
-	MAX_CONNECTIONS = 512;
+	MAX_SESSIONS = 512;
 	BUFFER_SIZE = 513; // Size given in bytes
 	INCOMING_MESSAGE_SIZE = BUFFER_SIZE - 1;
 
 	// Keep track of the client sockets
-	sockets = new int[MAX_CONNECTIONS];
+	sockets = new int[MAX_SESSIONS];
 
 	// Handle the buffer
 	buffer = new char[BUFFER_SIZE];
@@ -55,8 +56,8 @@ void * KVServer::startServerThread(void * arg)
 
 void KVServer::initialize()
 {
-	// Ensure that all sockets are invalid to boot
-	for (int i = 0; i < MAX_CONNECTIONS; i++)
+	// Ensure that all sockets are invalid to boot (if using MT)
+	for (int i = 0; i < MAX_SESSIONS; i++)
 	{
 		sockets[i] = 0;
 	}
@@ -99,16 +100,11 @@ void KVServer::openSocket()
 	}
 
 	// Start listening on this port - second arg: max pending connections
-	if (listen(primary_socket, MAX_CONNECTIONS) < 0)
+	if (listen(primary_socket, MAX_SESSIONS) < 0)
 	{
 		perror("Error: could not listen on port");
 		exit(1);
 	}
-
-	KVSocket a_socket;
-	a_socket.socket_fd = primary_socket;
-	a_socket.active    = true;
-	socket_vector.push_back(a_socket);
 
 	// Keep track of the last update to the sockets
 	gettimeofday(&sockets_last_modified, NULL);
@@ -170,10 +166,20 @@ void KVServer::listenForActivity()
 void KVServer::resetSocketDescriptors()
 {
 	// Determine if we have any sockets to close
-	while (sockets_to_close.size() > 0)
+	vector<int> copy_of_sockets_to_close;
+
+	// Trying to do as little work as possible here... Just copy and clear.
+	pthread_mutex_lock(&mutex_sockets_to_close);
+	copy_of_sockets_to_close = KVServer::sockets_to_close; // Make a copy of the data
+	KVServer::sockets_to_close.clear(); // Empty the sockets to close
+	pthread_mutex_unlock(&mutex_sockets_to_close);
+
+	// Close those sockets ready to close.
+	while (copy_of_sockets_to_close.size() > 0)
 	{
-		closeSocket(sockets_to_close.front());
-		sockets_to_close.erase(sockets_to_close.begin());
+		cout << "Closed socket FD: " << copy_of_sockets_to_close.front() << endl;
+		closeSocket(copy_of_sockets_to_close.front());
+		copy_of_sockets_to_close.erase(copy_of_sockets_to_close.begin());
 	}
 
 	// Reset the current socket descriptors
@@ -184,7 +190,7 @@ void KVServer::resetSocketDescriptors()
 	max_connection = primary_socket;
 
 	// Add remaining sockets
-	for (int i = 0; i < MAX_CONNECTIONS; i++)
+	for (int i = 0; i < MAX_SESSIONS; i++)
 	{
 		// Validate the socket
 		if (sockets[i] <= 0) continue;
@@ -217,11 +223,11 @@ void KVServer::handleNewConnectionRequest()
 	cout << "New Connection Request: " << inet_ntoa(client_address.sin_addr) << ":" << ntohs(client_address.sin_port) << endl;
 
 	// Add socket to open slot
-	for (int i = 0; i <= MAX_CONNECTIONS; i++)
+	for (int i = 0; i <= MAX_SESSIONS; i++)
 	{
 		// If we reach the maximum number of clients, we've gone too far
 		// Can't accept a new connection!
-		if (i == MAX_CONNECTIONS)
+		if (i == MAX_SESSIONS)
 		{
 			// Report connection denied
 			cout << "Reached maximum number of clients, denied connection request" << endl;
@@ -239,11 +245,6 @@ void KVServer::handleNewConnectionRequest()
 
 		// Add new socket
 		sockets[i] = new_socket;
-
-		KVSocket a_socket;
-		a_socket.socket_fd = new_socket;
-		a_socket.active    = true;
-		socket_vector.push_back(a_socket);
 
 		// Spawn the new thread
 		pthread_t node_thread;
@@ -267,21 +268,11 @@ void KVServer::handleNewConnectionRequest()
 
 void KVServer::closeSocket(int socket)
 {
-	// Remove the socket from the vector
-	vector<KVSocket>::iterator iter;
-	for (iter = socket_vector.begin(); iter != socket_vector.end(); )
-	{
-		if (iter->socket_fd == socket)
-			iter = socket_vector.erase(iter);
-		else
-			++iter;
-	}
-
 	// Keep track of the last update to the sockets
 	gettimeofday(&sockets_last_modified, NULL);
 
 	// Remove from the int array
-	for (int i = 0; i < MAX_CONNECTIONS; i++)
+	for (int i = 0; i < MAX_SESSIONS; i++)
 	{
 		if (socket == sockets[i])
 		{
