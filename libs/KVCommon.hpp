@@ -40,12 +40,6 @@
 using namespace std;
 
 typedef struct {
-	unsigned int socket_fd;
-	bool active;
-	void * cache_address;
-} KVSocket;
-
-typedef struct {
 	string address;
 	int port;
 } KVConnectionDetails;

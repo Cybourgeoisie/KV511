@@ -6,6 +6,9 @@
 
 using namespace std;
 
+// Mutexes
+static pthread_mutex_t mutex_sockets_to_close = PTHREAD_MUTEX_INITIALIZER;
+
 class KVServer
 {
 	private:
@@ -22,7 +25,7 @@ class KVServer
 
 		// Server limits and port
 		int PORT_NUMBER;
-		int MAX_CONNECTIONS;
+		int MAX_SESSIONS;
 		int BUFFER_SIZE;
 		int INCOMING_MESSAGE_SIZE;
 
@@ -36,10 +39,6 @@ class KVServer
 
 		// Managing Sockets
 		timeval sockets_last_modified;
-
-		// Available sockets
-		vector<KVSocket> socket_vector;
-		vector<int> sockets_to_close;
 
 		// Socket descriptors used for select()
 		fd_set socket_descriptors;
@@ -56,6 +55,8 @@ public:
 		// Our KV cache
 		static KVCache * cache;
 
+		// Keep track of the sockets that need to be freed
+		static vector<int> sockets_to_close;
 };
 
 #endif

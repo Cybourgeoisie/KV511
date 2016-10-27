@@ -95,10 +95,12 @@ void KVServerThread::listenForActivity()
 			}
 			else
 			{
-				cout << "Closed the connection" << endl;
-				
+				cout << "Need to close the connection for socket FD: " << socket_fd << endl;
+
 				// Close and free the socket
-				close(socket_fd);
+				pthread_mutex_lock(&mutex_sockets_to_close);
+				KVServer::sockets_to_close.push_back(socket_fd);
+				pthread_mutex_unlock(&mutex_sockets_to_close);
 
 				// Leave!
 				return;

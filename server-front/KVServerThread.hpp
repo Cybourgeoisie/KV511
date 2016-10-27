@@ -3,6 +3,9 @@
 
 using namespace std;
 
+// Mutexes
+//static pthread_mutex_t mutex_cache = PTHREAD_MUTEX_INITIALIZER;
+
 class KVServerThread
 {
 	private:
