@@ -21,14 +21,33 @@ void KVClientThread::sendRequests()
 	if (makeConnection(details->address, details->port))
 	{
 		cout << "Connection made." << endl;
+        auto thread_id = std::this_thread::get_id();
+        stringstream ss;
+        ss << thread_id;
+        string fileName = ss.str();
+        string sessionTxt = "_Session";
+        fileName.append(sessionTxt);
+
+        string command = "python ../libs/jsonGenReq.py ";
+        command.append(to_string(SESSION_LENGTH));
+        command.append(" ");
+        command.append(fileName);
+        cout << command << endl;
+        system(command.c_str());
+		nlohmann::json inputJson;
+		inputJson = nlohmann::json::parse(get_file_contents(fileName.c_str()));
 
 		long i = 0;
 		while (1)
 		{
-			string request = createRequestJson("POST", std::to_string(i), "World!");
-            sendMessageToSocket(request, server_socket);
-            sleep(5);
-			i += 1;
+			for (nlohmann::json::iterator it = inputJson.begin(); it != inputJson.end(); ++it) {
+				sendMessageToSocket(*it, server_socket);
+				sleep(5);
+			}
+			//string request = createRequestJson("POST", std::to_string(i), "World!");
+            //sendMessageToSocket(request, server_socket);
+            //sleep(5);
+			//i += 1;
 		}
 	}
 }

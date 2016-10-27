@@ -16,6 +16,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <thread>
+#include <cerrno>
 
 // Directory Management
 #include <dirent.h>
@@ -27,6 +29,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <poll.h>
+
 
 // Multithreading
 #include <pthread.h>
@@ -61,5 +64,8 @@ class KVCommon
 		static string trimWhitespace(string);
 		static void clearScreen();
 };
+std::string get_file_contents(const char *);
+
+#define SESSION_LENGTH 10
 
 #endif
