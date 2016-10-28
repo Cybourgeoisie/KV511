@@ -4,6 +4,7 @@
 
 #include "KVServer.hpp"
 #include "../libs/KVCommon.cpp"
+#include "../libs/KVCache.cpp"
 #include "KVServerThread.cpp"
 
 /**
@@ -12,6 +13,9 @@
 
 KVCache * KVServer::cache = new KVCache();
 vector<int> KVServer::sockets_to_close;
+
+// Be aware of the global var provided by server.cpp
+extern bool ASYNC_MODE;
 
 KVServer::KVServer()
 {
@@ -28,13 +32,13 @@ KVServer::KVServer()
 
 	// Handle the buffer
 	buffer = new char[BUFFER_SIZE];
-
-	// Keep track of the last update to the sockets
-	gettimeofday(&sockets_last_modified, NULL);
 }
 
-void KVServer::start()
+void KVServer::start(bool use_async)
 {
+	// Determine if we want to use MT
+	ASYNC_MODE = use_async;
+
 	// Open the socket and listen for connections
 	initialize();
 	openSocket();
@@ -106,9 +110,6 @@ void KVServer::openSocket()
 		exit(1);
 	}
 
-	// Keep track of the last update to the sockets
-	gettimeofday(&sockets_last_modified, NULL);
-
 	cout << "Listening on port " << PORT_NUMBER << endl;
 }
 
@@ -138,13 +139,22 @@ void KVServer::listenForActivity()
 		// Ready the socket descriptors
 		this->resetSocketDescriptors();
 
-		// Listen only on the primary socket
-		struct pollfd fds[1];
-		fds[0].fd     = primary_socket;
-		fds[0].events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLWRBAND;
+		// Determine if we're listening to all ports or just the primary
+		int activity;
+		if (ASYNC_MODE)
+		{
 
-		// Wait for activity
-		int activity = poll(fds, 1, NULL);
+		}
+		else
+		{
+			// Listen only on the primary socket
+			struct pollfd fds[1];
+			fds[0].fd     = primary_socket;
+			fds[0].events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLWRBAND;
+
+			// Wait for activity
+			activity = poll(fds, 1, NULL);
+		}
 
 		// Validate the activity
 		if ((activity < 0) && (errno!=EINTR))
@@ -154,7 +164,15 @@ void KVServer::listenForActivity()
 		}
 
 		// Handle a new connection
-		this->handleNewConnectionRequest();
+		if (ASYNC_MODE)
+		{
+
+		}
+		else
+		{
+			// In MT mode, the primary only handles new connection requests
+			this->handleNewConnectionRequest();
+		}
 	}
 }
 
@@ -168,11 +186,20 @@ void KVServer::resetSocketDescriptors()
 	// Determine if we have any sockets to close
 	vector<int> copy_of_sockets_to_close;
 
-	// Trying to do as little work as possible here... Just copy and clear.
-	pthread_mutex_lock(&mutex_sockets_to_close);
-	copy_of_sockets_to_close = KVServer::sockets_to_close; // Make a copy of the data
-	KVServer::sockets_to_close.clear(); // Empty the sockets to close
-	pthread_mutex_unlock(&mutex_sockets_to_close);
+	if (ASYNC_MODE)
+	{
+		// For (1) fair comparison with MT, and (2) to keep code cleaner
+		copy_of_sockets_to_close = KVServer::sockets_to_close; // Make a copy of the data
+		KVServer::sockets_to_close.clear(); // Empty the sockets to close
+	}
+	else
+	{
+		// Trying to do as little work as possible here... Just copy and clear.
+		pthread_mutex_lock(&mutex_sockets_to_close);
+		copy_of_sockets_to_close = KVServer::sockets_to_close; // Make a copy of the data
+		KVServer::sockets_to_close.clear(); // Empty the sockets to close
+		pthread_mutex_unlock(&mutex_sockets_to_close);
+	}
 
 	// Close those sockets ready to close.
 	while (copy_of_sockets_to_close.size() > 0)
@@ -246,16 +273,17 @@ void KVServer::handleNewConnectionRequest()
 		// Add new socket
 		sockets[i] = new_socket;
 
-		// Spawn the new thread
-		pthread_t node_thread;
-		if (pthread_create(&node_thread, NULL, &KVServer::startServerThread, (void *) new_socket) != 0)
+		// Only need to worry about MT here - async's work is set with the sockets[] array
+		if (!ASYNC_MODE)
 		{
-			perror("Error: could not spawn peer listeners");
-			exit(1);
+			// MT - create a new thread, pass off the socket to it
+			pthread_t node_thread;
+			if (pthread_create(&node_thread, NULL, &KVServer::startServerThread, (void *) new_socket) != 0)
+			{
+				perror("Error: could not spawn peer listeners");
+				exit(1);
+			}			
 		}
-
-		// Keep track of the last update to the sockets
-		gettimeofday(&sockets_last_modified, NULL);
 
 		break;
 	}
@@ -268,9 +296,6 @@ void KVServer::handleNewConnectionRequest()
 
 void KVServer::closeSocket(int socket)
 {
-	// Keep track of the last update to the sockets
-	gettimeofday(&sockets_last_modified, NULL);
-
 	// Remove from the int array
 	for (int i = 0; i < MAX_SESSIONS; i++)
 	{

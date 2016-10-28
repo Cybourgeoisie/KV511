@@ -37,9 +37,6 @@
 // JSON parsing support
 #include "json.hpp"
 
-// Our local cache
-#include "KVCache.cpp"
-
 using namespace std;
 
 typedef struct {

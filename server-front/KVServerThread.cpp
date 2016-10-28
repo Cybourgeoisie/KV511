@@ -4,6 +4,9 @@
 
 #include "KVServerThread.hpp"
 
+using namespace std;
+using namespace nlohmann;
+
 /**
  * Public Methods
  */
@@ -64,13 +67,22 @@ void KVServerThread::listenForActivity()
 			if (message_size > 0)
 			{
 				//parse message and execute accordingly
-				nlohmann::json request = nlohmann::json::parse(buffer);
-				std::cout << request.dump(4) << std::endl;
-				auto key = request["key"].get<std::string>();
-				auto requestType = request["type"].get<std::string>();
+				json request = json::parse(buffer);
+				cout << request.dump(4) << endl;
+
+				string key;
+				if (request["key"].is_string())
+					key = request["key"].get<string>();
+				else if (request["key"].is_number())
+					key = to_string(request["key"].get<int>());
+
+				string requestType;
+				if (request["type"].is_string())
+					requestType = request["type"].get<string>();
+
 				string response;
 				if (requestType == "GET") {
-					std::cout << "received Get request";
+					cout << "received Get request";
 					string value = string();
 
 					bool inTable = KVServer::cache->get_value(key, value);
@@ -83,8 +95,13 @@ void KVServerThread::listenForActivity()
 					}
 
 				} else if (requestType == "POST") {
-					std::cout << "received POST request";
-					auto value = request["value"].get<std::string>();
+					cout << "received POST request";
+
+					string value;
+					if (request["value"].is_string())
+						value = request["value"].get<string>();
+					else if (request["value"].is_number())
+						value = to_string(request["value"].get<int>());
 					
 					bool success = KVServer::cache->post_value(key, value);
 
@@ -114,7 +131,7 @@ void KVServerThread::listenForActivity()
  */
 
 string KVServerThread::createResponseJson(string type, string key, string value, int code) {
-    nlohmann::json response;
+    json response;
     response["type"] = type;
     response["key"] = key;
     response["value"] = value;

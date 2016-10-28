@@ -1,7 +1,9 @@
 #ifndef KVSERVER_H
 #define KVSERVER_H
 
+// Our local cache
 #include "../libs/KVCommon.hpp"
+#include "../libs/KVCache.hpp"
 #include "KVServerThread.hpp"
 
 using namespace std;
@@ -37,15 +39,12 @@ class KVServer
 		// Buffer
 		char * buffer;
 
-		// Managing Sockets
-		timeval sockets_last_modified;
-
 		// Socket descriptors used for select()
 		fd_set socket_descriptors;
 
 public:
 		KVServer();
-		void start();
+		void start(bool use_async);
 		void listenForActivity();
 
 		// Remove network connections

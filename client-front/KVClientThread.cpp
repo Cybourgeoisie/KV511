@@ -5,6 +5,7 @@
 #include "KVClientThread.hpp"
 
 using namespace std;
+using namespace nlohmann;
 
 /**
  * Public Methods
@@ -22,9 +23,11 @@ void KVClientThread::sendRequests()
 	{
 		cout << "Connection made." << endl;
         auto thread_id = std::this_thread::get_id();
+
         stringstream ss;
         ss << thread_id;
-        string fileName = ss.str();
+        string threadId = ss.str();
+        string fileName = threadId;
         string sessionTxt = "_Session";
         fileName.append(sessionTxt);
 
@@ -32,23 +35,23 @@ void KVClientThread::sendRequests()
         command.append(to_string(SESSION_LENGTH));
         command.append(" ");
         command.append(fileName);
-        cout << command << endl;
-        system(command.c_str());
-		nlohmann::json inputJson;
-		inputJson = nlohmann::json::parse(get_file_contents(fileName.c_str()));
+        cout << "Generated filename: " << command << endl;
 
-		long i = 0;
-		while (1)
+        // Run the Python script
+        system(command.c_str());
+
+        // Pull back in the created JSON
+		json inputJson;
+		inputJson = json::parse(get_file_contents(fileName.c_str()));
+
+		// Send all of the messages
+		for (json::iterator it = inputJson.begin(); it != inputJson.end(); ++it)
 		{
-			for (nlohmann::json::iterator it = inputJson.begin(); it != inputJson.end(); ++it) {
-				sendMessageToSocket(*it, server_socket);
-				sleep(5);
-			}
-			//string request = createRequestJson("POST", std::to_string(i), "World!");
-            //sendMessageToSocket(request, server_socket);
-            //sleep(5);
-			//i += 1;
+			sendMessageToSocket((*it).dump(), server_socket);
+			sleep(1);
 		}
+
+		cout << "-- Thread ID " << threadId << " finished --" << endl;
 	}
 }
 
@@ -61,7 +64,7 @@ void KVClientThread::sendMessageToSocket(string request, int socket) {
 }
 
 string KVClientThread::createRequestJson(string type, string key, string value) {
-	nlohmann::json request;
+	json request;
 	request["type"] = type;
 	request["key"] = key;
 	request["value"] = value;
