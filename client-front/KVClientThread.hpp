@@ -7,6 +7,13 @@ class KVClientThread
 {
 	private:
 		
+		// Server limits and port
+		int BUFFER_SIZE;
+		int INCOMING_MESSAGE_SIZE;
+
+		// Buffer
+		char * buffer;
+
 		// Make a connection to the server
 		bool makeConnection(string, int);
 
@@ -15,6 +22,7 @@ class KVClientThread
 		KVConnectionDetails * details;
 
         void sendMessageToSocket(string, int);
+		void listenForActivity();
 
         string createRequestJson(string, string, string);
 

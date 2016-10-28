@@ -14,6 +14,13 @@ using namespace nlohmann;
 KVClientThread::KVClientThread(KVConnectionDetails * conn_details)
 {
 	details = conn_details;
+
+	// Define server limits
+	BUFFER_SIZE = 513; // Size given in bytes
+	INCOMING_MESSAGE_SIZE = BUFFER_SIZE - 1;
+
+	// Handle the buffer
+	buffer = new char[BUFFER_SIZE];
 }
 
 void KVClientThread::sendRequests()
@@ -47,11 +54,54 @@ void KVClientThread::sendRequests()
 		// Send all of the messages
 		for (json::iterator it = inputJson.begin(); it != inputJson.end(); ++it)
 		{
+			// Send the message
 			sendMessageToSocket((*it).dump(), server_socket);
+
+			// Currently, this will BLOCK
+			// It waits for the response from the server.
+			// If we want to flood the server with non-blocking requests, 
+			// then just comment this out. And, of course, remove the sleep()
+			listenForActivity();
+
 			sleep(1);
 		}
 
 		cout << "-- Thread ID " << threadId << " finished --" << endl;
+	}
+}
+
+void KVClientThread::listenForActivity()
+{
+	cout << "... Listening for activity on thread..." << endl;
+
+	// Construct the FD to listen to
+	struct pollfd fds[1];
+	fds[0].fd     = server_socket;
+	fds[0].events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLWRBAND;
+
+	// Wait for activity
+	int activity = poll(fds, 1, NULL);
+
+	// Validate the activity
+	if ((activity < 0) && (errno!=EINTR))
+	{
+		perror("Error: select failed");
+		exit(1);
+	}
+	else
+	{
+		// Clear out the buffer
+		memset(&buffer[0], 0, BUFFER_SIZE);
+
+		// Read the incoming message into the buffer
+		int message_size = read(server_socket, buffer, INCOMING_MESSAGE_SIZE);
+
+		// Read what happened, if anything
+		if (message_size > 0)
+		{
+			json request = json::parse(buffer);
+			cout << "Recieved response: " << request.dump() << endl;
+		}
 	}
 }
 

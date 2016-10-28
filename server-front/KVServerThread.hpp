@@ -22,6 +22,7 @@ class KVServerThread
 
 		// Messages
 		string createResponseJson(string, string, string, int);
+        void sendMessageToSocket(string, int);
 
 	public:
 		KVServerThread(int);

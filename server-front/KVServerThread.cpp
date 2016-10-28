@@ -81,20 +81,23 @@ void KVServerThread::listenForActivity()
 					requestType = request["type"].get<string>();
 
 				string response;
-				if (requestType == "GET") {
+				if (requestType == "GET")
+				{
 					cout << "received Get request";
 					string value = string();
 
 					bool inTable = KVServer::cache->get_value(key, value);
+
 					if (inTable == false) {
 						response = createResponseJson("GET", key, "", 404);
-						cout << "Key Not Found.";
+						cout << endl << "Key Not Found." << endl;
 					} else {
 						response = createResponseJson("GET", key, value, 200);
-						cout << value;
+						cout << endl << "Key found: " << value << endl;
 					}
-
-				} else if (requestType == "POST") {
+				}
+				else if (requestType == "POST")
+				{
 					cout << "received POST request";
 
 					string value;
@@ -107,6 +110,9 @@ void KVServerThread::listenForActivity()
 
 					response = createResponseJson("POST", key, value, 200);
 				}
+
+				// Return the result to the client
+				sendMessageToSocket(request.dump(), socket_fd);
 
 				KVServer::cache->print_contents();
 			}
@@ -124,6 +130,14 @@ void KVServerThread::listenForActivity()
 			}
 		}
 	}
+}
+
+void KVServerThread::sendMessageToSocket(string request, int socket) {
+    //write the message to the client socket
+    if (write(socket, request.c_str(), request.length()) < 0){
+        perror("Error: could not send message to client");
+        exit(1);
+    }
 }
 
 /**
