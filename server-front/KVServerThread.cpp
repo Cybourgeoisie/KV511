@@ -13,13 +13,6 @@ using namespace nlohmann;
 
 KVServerThread::KVServerThread(int socket_number)
 {
-	// Define server limits
-	BUFFER_SIZE = 513; // Size given in bytes
-	INCOMING_MESSAGE_SIZE = BUFFER_SIZE - 1;
-
-	// Handle the buffer
-	buffer = new char[BUFFER_SIZE];
-
 	// Keep track of the current socket number
 	socket_fd = socket_number;
 	printf("Socket number: %d\n", socket_fd);
@@ -57,99 +50,9 @@ void KVServerThread::listenForActivity()
 		}
 		else
 		{
-			// Clear out the buffer
-			memset(&buffer[0], 0, BUFFER_SIZE);
-
-			// Read the incoming message into the buffer
-			int message_size = read(socket_fd, buffer, INCOMING_MESSAGE_SIZE);
-
-			// Read what happened, if anything
-			if (message_size > 0)
-			{
-				//parse message and execute accordingly
-				json request = json::parse(buffer);
-				cout << request.dump(4) << endl;
-
-				string key;
-				if (request["key"].is_string())
-					key = request["key"].get<string>();
-				else if (request["key"].is_number())
-					key = to_string(request["key"].get<int>());
-
-				string requestType;
-				if (request["type"].is_string())
-					requestType = request["type"].get<string>();
-
-				string response;
-				if (requestType == "GET")
-				{
-					cout << "received Get request";
-					string value = string();
-
-					bool inTable = KVServer::cache->get_value(key, value);
-
-					if (inTable == false) {
-						response = createResponseJson("GET", key, "", 404);
-						cout << endl << "Key Not Found." << endl;
-					} else {
-						response = createResponseJson("GET", key, value, 200);
-						cout << endl << "Key found: " << value << endl;
-					}
-				}
-				else if (requestType == "POST")
-				{
-					cout << "received POST request";
-
-					string value;
-					if (request["value"].is_string())
-						value = request["value"].get<string>();
-					else if (request["value"].is_number())
-						value = to_string(request["value"].get<int>());
-					
-					bool success = KVServer::cache->post_value(key, value);
-
-					response = createResponseJson("POST", key, value, 200);
-				}
-
-				// Return the result to the client
-				sendMessageToSocket(response, socket_fd);
-
-				KVServer::cache->print_contents();
-			}
-			else
-			{
-				cout << "Need to close the connection for socket FD: " << socket_fd << endl;
-
-				// Close and free the socket
-				pthread_mutex_lock(&mutex_sockets_to_close);
-				KVServer::sockets_to_close.push_back(socket_fd);
-				pthread_mutex_unlock(&mutex_sockets_to_close);
-
-				// Leave!
+			bool is_socket_open = KVServer::handleMessage(socket_fd);
+			if (!is_socket_open)
 				return;
-			}
 		}
 	}
 }
-
-void KVServerThread::sendMessageToSocket(string request, int socket) {
-    //write the message to the client socket
-    if (write(socket, request.c_str(), request.length()) < 0){
-        perror("Error: could not send message to client");
-        exit(1);
-    }
-}
-
-/**
- * Sending and receiving messages
- */
-
-string KVServerThread::createResponseJson(string type, string key, string value, int code) {
-    json response;
-    response["type"] = type;
-    response["key"] = key;
-    response["value"] = value;
-    response["code"] = code;
-    return response.dump();
-}
-

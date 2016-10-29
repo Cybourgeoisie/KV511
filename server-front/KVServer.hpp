@@ -28,16 +28,11 @@ class KVServer
 		// Server limits and port
 		int PORT_NUMBER;
 		int MAX_SESSIONS;
-		int BUFFER_SIZE;
-		int INCOMING_MESSAGE_SIZE;
 
 		// Sockets
 		int primary_socket;
 		int * sockets;
 		int max_connection;
-
-		// Buffer
-		char * buffer;
 
 		// Socket descriptors used for select()
 		fd_set socket_descriptors;
@@ -51,11 +46,20 @@ public:
 		void closeSocket(int);
 		void queueSocketToClose(int);
 
+		// Messages
+		static string createResponseJson(string, string, string, int);
+		static void sendMessageToSocket(string, int);
+		static bool handleMessage(int);
+
 		// Our KV cache
 		static KVCache * cache;
 
 		// Keep track of the sockets that need to be freed
 		static vector<int> sockets_to_close;
+
+		// "Constant" values
+		static int BUFFER_SIZE;
+		static int INCOMING_MESSAGE_SIZE;
 };
 
 #endif

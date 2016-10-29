@@ -14,6 +14,9 @@
 KVCache * KVServer::cache = new KVCache();
 vector<int> KVServer::sockets_to_close;
 
+int KVServer::BUFFER_SIZE = 513; // Size given in bytes
+int KVServer::INCOMING_MESSAGE_SIZE = KVServer::BUFFER_SIZE - 1;
+
 // Be aware of the global var provided by server.cpp
 extern bool ASYNC_MODE;
 
@@ -24,20 +27,20 @@ KVServer::KVServer()
 
 	// Define server limits
 	MAX_SESSIONS = 512;
-	BUFFER_SIZE = 513; // Size given in bytes
-	INCOMING_MESSAGE_SIZE = BUFFER_SIZE - 1;
 
 	// Keep track of the client sockets
 	sockets = new int[MAX_SESSIONS];
-
-	// Handle the buffer
-	buffer = new char[BUFFER_SIZE];
 }
 
 void KVServer::start(bool use_async)
 {
 	// Determine if we want to use MT
 	ASYNC_MODE = use_async;
+
+	if (ASYNC_MODE)
+		cout << "Running server in Async mode." << endl;
+	else
+		cout << "Running server in MT mode." << endl;
 
 	// Open the socket and listen for connections
 	initialize();
@@ -128,14 +131,19 @@ int KVServer::bindSocket(int socket)
 	return ::bind(socket, (struct sockaddr *) &server_address, sizeof(server_address));
 }
 
+/**
+ *
+ * TODO - Now that we have support for MT and ST, we need to make the ST
+ *        version asynchronous. And then event-based support.
+ *
+ **/
+
 void KVServer::listenForActivity()
 {
 	KVCommon::clearScreen();
 
 	while (true) 
 	{
-		cout << "... Listening for new connections on main thread..." << endl;
-
 		// Ready the socket descriptors
 		this->resetSocketDescriptors();
 
@@ -143,7 +151,8 @@ void KVServer::listenForActivity()
 		int activity;
 		if (ASYNC_MODE)
 		{
-
+			// Wait for activity
+			activity = select(max_connection + 1, &socket_descriptors, NULL, NULL, NULL);
 		}
 		else
 		{
@@ -166,7 +175,14 @@ void KVServer::listenForActivity()
 		// Handle a new connection
 		if (ASYNC_MODE)
 		{
+			// Anything on the primary socket is a new connection
+			if (FD_ISSET(primary_socket, &socket_descriptors))
+			{
+				this->handleNewConnectionRequest();
+			}
 
+			// Perform any open activities on all other clients
+			this->handleExistingConnections();
 		}
 		else
 		{
@@ -174,6 +190,23 @@ void KVServer::listenForActivity()
 			this->handleNewConnectionRequest();
 		}
 	}
+}
+
+void KVServer::sendMessageToSocket(string request, int socket) {
+    //write the message to the client socket
+    if (write(socket, request.c_str(), request.length()) < 0){
+        perror("Error: could not send message to client");
+        exit(1);
+    }
+}
+
+string KVServer::createResponseJson(string type, string key, string value, int code) {
+    json response;
+    response["type"] = type;
+    response["key"] = key;
+    response["value"] = value;
+    response["code"] = code;
+    return response.dump();
 }
 
 
@@ -287,6 +320,106 @@ void KVServer::handleNewConnectionRequest()
 
 		break;
 	}
+}
+
+void KVServer::handleExistingConnections()
+{
+	// Prepare the client address
+	struct sockaddr_in client_address;
+	socklen_t client_address_length = sizeof(client_address);
+
+	// Iterate over all clients
+	for (int i = 0; i < MAX_SESSIONS; i++) 
+	{
+		if (!FD_ISSET(sockets[i], &socket_descriptors)) continue;
+
+		KVServer::handleMessage(sockets[i]);
+	}
+}
+
+bool KVServer::handleMessage(int socket_fd)
+{
+	// Handle the buffer
+	char * buffer = new char[BUFFER_SIZE];
+
+	// Clear out the buffer
+	memset(&buffer[0], 0, BUFFER_SIZE);
+
+	// Read the incoming message into the buffer
+	int message_size = read(socket_fd, buffer, INCOMING_MESSAGE_SIZE);
+
+	// Handle a closed connection
+	if (message_size == 0)
+	{
+		cout << "Need to close the connection for socket FD: " << socket_fd << endl;
+
+		if (ASYNC_MODE)
+		{
+			KVServer::sockets_to_close.push_back(socket_fd);
+		}
+		else
+		{
+			pthread_mutex_lock(&mutex_sockets_to_close);
+			KVServer::sockets_to_close.push_back(socket_fd);
+			pthread_mutex_unlock(&mutex_sockets_to_close);
+		}
+
+		return false;
+	}
+	else
+	{
+		//parse message and execute accordingly
+		json request = json::parse(buffer);
+		cout << request.dump(4) << endl;
+
+		string key;
+		if (request["key"].is_string())
+			key = request["key"].get<string>();
+		else if (request["key"].is_number())
+			key = to_string(request["key"].get<int>());
+
+		string requestType;
+		if (request["type"].is_string())
+			requestType = request["type"].get<string>();
+
+		string response;
+		if (requestType == "GET")
+		{
+			cout << "received Get request";
+			string value = string();
+
+			bool inTable = KVServer::cache->get_value(key, value);
+
+			if (inTable == false) {
+				response = KVServer::createResponseJson("GET", key, "", 404);
+				cout << endl << "Key Not Found." << endl;
+			} else {
+				response = KVServer::createResponseJson("GET", key, value, 200);
+				cout << endl << "Key found: " << value << endl;
+			}
+		}
+		else if (requestType == "POST")
+		{
+			cout << "received POST request";
+
+			string value;
+			if (request["value"].is_string())
+				value = request["value"].get<string>();
+			else if (request["value"].is_number())
+				value = to_string(request["value"].get<int>());
+			
+			bool success = KVServer::cache->post_value(key, value);
+
+			response = KVServer::createResponseJson("POST", key, value, 200);
+		}
+
+		// Return the result to the client
+		KVServer::sendMessageToSocket(response, socket_fd);
+
+		KVServer::cache->print_contents();
+	}
+
+	return true;
 }
 
 

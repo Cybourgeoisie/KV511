@@ -81,7 +81,10 @@ void KVClientThread::sendRequests()
 				api->post(key, value);
 			}
 
-			//sleep(1);
+			// Need to sleep at least a little bit, otherwise the Async server
+			// could starve threads (currently accessing sockets linearly)
+			//usleep(10000); // 10 ms
+			sleep(1);
 		}
 
 		api->close();
