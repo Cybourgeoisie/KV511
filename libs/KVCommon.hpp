@@ -58,5 +58,6 @@ class KVCommon
 std::string get_file_contents(const char *);
 
 #define SESSION_LENGTH 10
+#define DEBUG_MODE true
 
 #endif

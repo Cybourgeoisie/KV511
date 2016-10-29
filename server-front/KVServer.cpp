@@ -370,7 +370,9 @@ bool KVServer::handleMessage(int socket_fd)
 	{
 		//parse message and execute accordingly
 		json request = json::parse(buffer);
-		cout << request.dump(4) << endl;
+		if (DEBUG_MODE) {
+			cout << request.dump(4) << endl;
+		}
 
 		string key;
 		if (request["key"].is_string())
@@ -442,4 +444,3 @@ void KVServer::closeSocket(int socket)
 	// Close and free the socket
 	close(socket);
 }
-
