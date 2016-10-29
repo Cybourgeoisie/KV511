@@ -112,7 +112,7 @@ void KVServerThread::listenForActivity()
 				}
 
 				// Return the result to the client
-				sendMessageToSocket(request.dump(), socket_fd);
+				sendMessageToSocket(response, socket_fd);
 
 				KVServer::cache->print_contents();
 			}
