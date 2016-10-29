@@ -87,6 +87,7 @@ void KVServer::openSocket()
 	if (primary_socket < 0)
 	{
 		perror("Error: could not open primary socket");
+		close(primary_socket);
 		exit(1);
 	}
 
@@ -95,8 +96,20 @@ void KVServer::openSocket()
 	if (setsockopt(primary_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0)
     {
         perror("Error: could not use setsockopt to set 'SO_REUSEADDR'");
+		close(primary_socket);
         exit(1);
     }
+
+	// Async only: set to non-blocking
+	if (ASYNC_MODE)
+	{
+		if (ioctl(primary_socket, FIONBIO, (char *)&opt) < 0)
+		{
+			perror("Error: ioctl() failed to make primary socket non-blocking");
+			close(primary_socket);
+			exit(-1);
+		}
+	}
 
 	// Bind to the given socket
 	int socket_status = this->bindSocket(primary_socket);
@@ -151,29 +164,51 @@ void KVServer::listenForActivity()
 		int activity;
 		if (ASYNC_MODE)
 		{
-			// Wait for activity
+			// Wait for activity - all sockets
 			activity = select(max_connection + 1, &socket_descriptors, NULL, NULL, NULL);
 		}
 		else
 		{
-			// Listen only on the primary socket
-			struct pollfd fds[1];
-			fds[0].fd     = primary_socket;
-			fds[0].events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLWRBAND;
-
-			// Wait for activity
-			activity = poll(fds, 1, NULL);
+			// Wait for activity - only STDIN and primary socket
+			// (STDIN usually has 0 reserved, and a custom socket is given a higher number)
+			activity = select(primary_socket + 1, &socket_descriptors, NULL, NULL, NULL);
 		}
 
 		// Validate the activity
 		if ((activity < 0) && (errno!=EINTR))
 		{
-			perror("Error: select failed");
-			exit(1);
+			if (ASYNC_MODE && (errno == EAGAIN || errno == EWOULDBLOCK))
+			{
+				cout << "** Notice ** Non-blocking error response." << endl;
+				continue;
+			}
+			else
+			{
+				perror("Error: select failed");
+				exit(1);
+			}
 		}
 
-		// Handle a new connection
-		if (ASYNC_MODE)
+		// Handle a key press
+		if (FD_ISSET(STDIN_FILENO, &socket_descriptors))
+		{
+			// Handle the buffer
+			char * buffer = new char[BUFFER_SIZE];
+
+			// Clear out the buffer
+			memset(&buffer[0], 0, BUFFER_SIZE);
+
+			// Read the incoming message into the buffer
+			int message_size = read(STDIN_FILENO, buffer, INCOMING_MESSAGE_SIZE);
+
+			// Allow the user to quit
+			if (message_size > 0 && buffer[0] == 'q')
+			{
+				close(primary_socket);
+				exit(1);
+			}
+		}
+		else if (ASYNC_MODE)
 		{
 			// Anything on the primary socket is a new connection
 			if (FD_ISSET(primary_socket, &socket_descriptors))
@@ -246,6 +281,9 @@ void KVServer::resetSocketDescriptors()
 	FD_ZERO(&socket_descriptors);
 	FD_SET(primary_socket, &socket_descriptors);
 
+	// Make sure we're listening on STDIN
+	FD_SET(STDIN_FILENO, &socket_descriptors);
+
 	// Keep track of the maximum socket descriptor for select()
 	max_connection = primary_socket;
 
@@ -275,8 +313,21 @@ void KVServer::handleNewConnectionRequest()
 	// Validate the new socket
 	if (new_socket < 0)
 	{
-		perror("Error: failure to accept new socket");
-		exit(1);
+		if (errno == EMFILE || errno == ENFILE)
+		{
+			// Report connection denied
+			cout << "Reached maximum number of clients, denied connection request" << endl;
+			return;
+		}
+		else if (errno != EWOULDBLOCK && errno != EAGAIN)
+		{
+			perror("Error: failure to accept new socket");
+			exit(1);
+		}
+		else
+		{
+			cout << "Non-blocking error response" << endl;
+		}
 	}
 
 	// Report new connection
@@ -293,8 +344,8 @@ void KVServer::handleNewConnectionRequest()
 			cout << "Reached maximum number of clients, denied connection request" << endl;
 
 			// Send refusal message to socket
-			string message = "Server is too busy, please try again later\r\n";
-			write(new_socket, message.c_str(), message.length());
+			//string message = "Server is too busy, please try again later\r\n";
+			//write(new_socket, message.c_str(), message.length());
 
 			close(new_socket);
 			break;
@@ -347,6 +398,19 @@ bool KVServer::handleMessage(int socket_fd)
 
 	// Read the incoming message into the buffer
 	int message_size = read(socket_fd, buffer, INCOMING_MESSAGE_SIZE);
+
+	if (message_size < 0)
+	{
+		if (errno != EWOULDBLOCK && errno != EAGAIN)
+		{
+			perror("  recv() failed");
+			exit(1);
+		}
+		else
+		{
+			cout << "Non-blocking error response" << endl;
+		}
+	}
 
 	// Handle a closed connection
 	if (message_size == 0)
