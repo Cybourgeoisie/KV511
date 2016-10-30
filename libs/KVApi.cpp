@@ -116,7 +116,7 @@ void KVApi::listenForActivity(string * response)
 	fds[0].events = POLLIN | POLLPRI | POLLOUT | POLLERR | POLLWRBAND;
 
 	// Wait for activity
-	int activity = poll(fds, 1, NULL);
+	int activity = poll(fds, 1, 0);
 
 	// Validate the activity
 	if ((activity < 0) && (errno!=EINTR))
