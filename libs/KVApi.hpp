@@ -29,7 +29,7 @@ class KVApi
 		KVConnectionDetails * details;
 
         void sendMessageToSocket(string, int);
-		void listenForActivity(string *);
+		string listenForActivity();
 
         string createRequestJson(string, string, string);
 

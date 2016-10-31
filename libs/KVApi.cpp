@@ -68,9 +68,8 @@ bool KVApi::close()
 
 string KVApi::send(string request)
 {
-	string response;
 	sendMessageToSocket(request, server_socket);
-	listenForActivity(&response);
+	string response = listenForActivity();
 	return response;
 }
 
@@ -99,14 +98,14 @@ KVApiResult_t KVApi::parseResponse(string s)
 	else if (inputJson["code"].is_number())
 		code = inputJson["code"].get<int>();
 
-	KVApiResult_t * result;
+	KVApiResult_t * result = new KVApiResult_t();
 	result->key   = key;
 	result->value = value;
 	result->err   = code;
 	return *result;
 }
 
-void KVApi::listenForActivity(string * response)
+string KVApi::listenForActivity()
 {
 	cout << "... Listening for activity on thread..." << endl;
 
@@ -135,11 +134,12 @@ void KVApi::listenForActivity(string * response)
 		// Read what happened, if anything
 		if (message_size > 0)
 		{
-			*response = string(buffer);
 			json request = json::parse(buffer);
 			cout << "Recieved response: " << request.dump() << endl;
 		}
 	}
+
+	return string(buffer);
 }
 
 void KVApi::sendMessageToSocket(string request, int socket) {
@@ -160,38 +160,30 @@ string KVApi::createRequestJson(string type, string key, string value) {
 
 bool KVApi::makeConnection(string host, int port)
 {
-	// Debug
-	printf("Connecting to %s:%d\n", details->address.c_str(), details->port);
+	//struct sockaddr_in server_address;
+	struct addrinfo hints, *res;
 
-	struct sockaddr_in server_address;
-	struct hostent * server;
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	// Find the server host
+	if (getaddrinfo(host.c_str(), to_string(port).c_str(), &hints, &res) != 0)
+	{
+		cout << "Error: could not find the host" << endl;
+		return false;
+	}
 
 	// Create the socket - use SOCK_STREAM for TCP, SOCK_DGRAM for UDP
-	server_socket = socket(AF_INET, SOCK_STREAM, 0);
+	server_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (server_socket < 0)
 	{
 		cout << "Error: could not open socket" << endl;
 		return false;
 	}
 
-	// Find the server host
-	server = gethostbyname(host.c_str());
-	if (server == NULL)
-	{
-		cout << "Error: could not find the host" << endl;
-		return false;
-	}
-
-	// Clear out the server_address memory space
-	memset((char *) &server_address, 0, sizeof(server_address));
-
-	// Configure the socket information
-	server_address.sin_family = AF_INET;
-	memcpy(server->h_addr, &server_address.sin_addr.s_addr, server->h_length);
-	server_address.sin_port = htons(port);
-
 	// Connect to the server
-	if (connect(server_socket, (struct sockaddr *) &server_address, sizeof(server_address)) < 0) 
+	if (connect(server_socket, res->ai_addr, res->ai_addrlen) < 0) 
 	{
 		perror("Error: could not connect to host");
 		return false;
