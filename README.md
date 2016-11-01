@@ -46,7 +46,7 @@ Client Config Specification:
 
 ~~~
 Pull in data by the expected input
-<ip address/localhost> <port number> <specification type> <number     of threads>
+<ip address/localhost> <port number> <specification type> <number of threads>
 Specification types are as follows:
 0 - purely debugging, single threaded, send a few sessions
 1 - "type 1" defined on page 4; single thread, ~100 sessions
