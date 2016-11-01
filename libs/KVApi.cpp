@@ -107,7 +107,8 @@ KVApiResult_t KVApi::parseResponse(string s)
 
 string KVApi::listenForActivity()
 {
-	cout << "... Listening for activity on thread..." << endl;
+	if (DEBUG_MODE)
+		cout << "... Listening for activity on thread..." << endl;
 
 	// Construct the FD to listen to
 	struct pollfd fds[1];
@@ -132,7 +133,7 @@ string KVApi::listenForActivity()
 		int message_size = read(server_socket, buffer, INCOMING_MESSAGE_SIZE);
 
 		// Read what happened, if anything
-		if (message_size > 0)
+		if (DEBUG_MODE && message_size > 0)
 		{
 			json request = json::parse(buffer);
 			cout << "Recieved response: " << request.dump() << endl;
@@ -160,7 +161,6 @@ string KVApi::createRequestJson(string type, string key, string value) {
 
 bool KVApi::makeConnection(string host, int port)
 {
-	//struct sockaddr_in server_address;
 	struct addrinfo hints, *res;
 
 	memset(&hints, 0, sizeof hints);

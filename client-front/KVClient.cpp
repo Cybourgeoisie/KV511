@@ -15,7 +15,8 @@ KVClient::KVClient() {}
 void KVClient::start(string address, int port, int spec_type, int thread_count)
 {
 	// Clear the screen to boot
-	KVCommon::clearScreen();
+	if (DEBUG_MODE)
+		KVCommon::clearScreen();
 
 	// Construct the connection details
 	KVConnectionDetails details;
@@ -38,7 +39,6 @@ void * KVClient::spawnThreads(KVConnectionDetails * details, int thread_count, l
 	{
 		// Spawn the new thread
 		pthread_t node_thread;
-
 		if (pthread_create(&node_thread, NULL, &KVClient::startClientThread, (void *) details) != 0)
 		{
 			perror("Error: could not spawn peer listeners");
@@ -76,7 +76,8 @@ bool KVClient::runUI()
 	switch (option)
 	{
 		case 'v':
-			KVCommon::clearScreen();
+			if (DEBUG_MODE)
+				KVCommon::clearScreen();
 			viewThreads();
 			break;
 		case 'q':
@@ -91,10 +92,12 @@ bool KVClient::runUI()
 
 char KVClient::showMenu()
 {
-	cout << "Welcome to the KV Network. What would you like to do?" << endl;
-	cout << "Please select an item below by entering the corresponding character." << endl << endl;
-	cout << "\t (v) View Node Progress" << endl;
-	cout << "\t (q) Quit" << endl << endl;
+	if (DEBUG_MODE) {
+		cout << "Welcome to the KV Network. What would you like to do?" << endl;
+		cout << "Please select an item below by entering the corresponding character." << endl << endl;
+		cout << "\t (v) View Node Progress" << endl;
+		cout << "\t (q) Quit" << endl << endl;
+	}
 
 	// Take the client's order
 	string option;

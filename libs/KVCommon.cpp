@@ -79,3 +79,27 @@ std::string get_file_contents(const char *filename)
 	}
 	throw(errno);
 }
+
+static __inline__ void performance_checkpoint(vector<string> * v, string ref)
+{
+    struct timespec t;
+	clock_gettime(KV511_CLOCK_TIMING, &t);
+	uint64_t t_int = 1000000000L * (t.tv_sec) + t.tv_nsec;
+	v->push_back(ref + " " + to_string(t_int));
+}
+
+void print_checkpoints_to_file(vector<string> * v, string filename)
+{
+	ostringstream oss;
+
+	if (!v->empty())
+	{
+		copy(v->begin(), v->end()-1, ostream_iterator<string>(oss, "\n"));
+		oss << v->back();
+	}
+
+	ofstream checkout_file;
+	checkout_file.open("../checkpoints/" + filename + ".txt");
+	checkout_file << oss.str() << endl;
+	checkout_file.close();
+}

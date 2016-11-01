@@ -5,7 +5,7 @@ default: all
 all: server
 
 server: server.cpp
-	$(CXX) -g -pthread -std=c++0x server.cpp -o server.o
+	$(CXX) -pg -pthread -std=c++0x server.cpp -o server.o
 
 clean:
 	$(RM) -r server.o server.o.dSYM

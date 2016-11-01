@@ -12,6 +12,9 @@ class KVClientThread
 		// Keep track of the server connection & details
 		KVConnectionDetails * details;
 
+		// Keep track of performance details
+		vector<string> * perf_cp;
+
 public:
 		KVClientThread(KVConnectionDetails *);
 		void sendRequests();

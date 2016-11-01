@@ -15,7 +15,11 @@ KVServerThread::KVServerThread(int socket_number)
 {
 	// Keep track of the current socket number
 	socket_fd = socket_number;
-	printf("Socket number: %d\n", socket_fd);
+	if (DEBUG_MODE)
+		printf("Socket number: %d\n", socket_fd);
+
+	// Keep track of performance details
+	perf_cp = new vector<string>();
 }
 
 void KVServerThread::start()
@@ -30,9 +34,16 @@ void KVServerThread::start()
 
 void KVServerThread::listenForActivity()
 {
+	// Some common, shared info for each session
+	auto thread_id = this_thread::get_id();
+	stringstream ss;
+	ss << thread_id;
+	string threadId = ss.str();
+	
 	while (true) 
 	{
-		cout << "... Listening for activity on thread..." << endl;
+		if (DEBUG_MODE)
+			cout << "... Listening for activity on thread..." << endl;
 
 		// Construct the FD to listen to
 		struct pollfd fds[1];
@@ -50,9 +61,13 @@ void KVServerThread::listenForActivity()
 		}
 		else
 		{
+			performance_checkpoint(perf_cp, "bmessage");
 			bool is_socket_open = KVServer::handleMessage(socket_fd);
-			if (!is_socket_open)
+			performance_checkpoint(perf_cp, "emessage");
+			if (!is_socket_open) {
+				print_checkpoints_to_file(perf_cp, "st_" + threadId);
 				return;
+			}
 		}
 	}
 }

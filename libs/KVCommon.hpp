@@ -58,6 +58,13 @@ class KVCommon
 std::string get_file_contents(const char *);
 
 #define SESSION_LENGTH 10
-#define DEBUG_MODE true
+#define DEBUG_MODE false
+
+// Determine how we're going to time for our benchmarks
+#ifdef  __APPLE__
+	#define KV511_CLOCK_TIMING CLOCK_MONOTONIC
+#elif __linux__
+	#define KV511_CLOCK_TIMING CLOCK_MONOTONIC_COARSE
+#endif
 
 #endif
