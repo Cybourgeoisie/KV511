@@ -10,7 +10,8 @@ tar:
 		./libs/*.hpp \
 		./libs/*.py \
 		./server-front/Makefile \
-		./client-front/Makefile
+		./client-front/Makefile \
+		./checkpoints/
 
 untar:
 	tar 

@@ -30,6 +30,9 @@ KVServer::KVServer()
 
 	// Keep track of the client sockets
 	sockets = new int[MAX_SESSIONS];
+
+	// Keep track of performance details
+	perf_cp = new vector<string>();
 }
 
 void KVServer::start(bool use_async)
@@ -126,7 +129,8 @@ void KVServer::openSocket()
 		exit(1);
 	}
 
-	cout << "Listening on port " << PORT_NUMBER << endl;
+	if (DEBUG_MODE)
+		cout << "Listening on port " << PORT_NUMBER << endl;
 }
 
 int KVServer::bindSocket(int socket)
@@ -144,16 +148,10 @@ int KVServer::bindSocket(int socket)
 	return ::bind(socket, (struct sockaddr *) &server_address, sizeof(server_address));
 }
 
-/**
- *
- * TODO - Now that we have support for MT and ST, we need to make the ST
- *        version asynchronous. And then event-based support.
- *
- **/
-
 void KVServer::listenForActivity()
 {
-	KVCommon::clearScreen();
+	if (DEBUG_MODE)
+		KVCommon::clearScreen();
 
 	while (true) 
 	{
@@ -204,6 +202,12 @@ void KVServer::listenForActivity()
 			// Allow the user to quit
 			if (message_size > 0 && buffer[0] == 'q')
 			{
+				// Finish closing the sockets
+				this->resetSocketDescriptors();
+
+				// Write the performance details to the file
+				print_checkpoints_to_file(perf_cp, "s_main");
+
 				close(primary_socket);
 				exit(1);
 			}
@@ -272,8 +276,10 @@ void KVServer::resetSocketDescriptors()
 	// Close those sockets ready to close.
 	while (copy_of_sockets_to_close.size() > 0)
 	{
-		cout << "Closed socket FD: " << copy_of_sockets_to_close.front() << endl;
+		if (DEBUG_MODE)
+			cout << "Closed socket FD: " << copy_of_sockets_to_close.front() << endl;
 		closeSocket(copy_of_sockets_to_close.front());
+		performance_checkpoint(perf_cp, "esocket " + to_string(copy_of_sockets_to_close.front()));
 		copy_of_sockets_to_close.erase(copy_of_sockets_to_close.begin());
 	}
 
@@ -331,7 +337,8 @@ void KVServer::handleNewConnectionRequest()
 	}
 
 	// Report new connection
-	cout << "New Connection Request: " << inet_ntoa(client_address.sin_addr) << ":" << ntohs(client_address.sin_port) << endl;
+	if (DEBUG_MODE)
+		cout << "New Connection Request: " << inet_ntoa(client_address.sin_addr) << ":" << ntohs(client_address.sin_port) << endl;
 
 	// Add socket to open slot
 	for (int i = 0; i <= MAX_SESSIONS; i++)
@@ -356,6 +363,8 @@ void KVServer::handleNewConnectionRequest()
 
 		// Add new socket
 		sockets[i] = new_socket;
+
+		performance_checkpoint(perf_cp, "bsocket " + to_string(new_socket));
 
 		// Only need to worry about MT here - async's work is set with the sockets[] array
 		if (!ASYNC_MODE)
@@ -384,7 +393,9 @@ void KVServer::handleExistingConnections()
 	{
 		if (!FD_ISSET(sockets[i], &socket_descriptors)) continue;
 
+		performance_checkpoint(perf_cp, "bmessage");
 		KVServer::handleMessage(sockets[i]);
+		performance_checkpoint(perf_cp, "emessage");
 	}
 }
 
@@ -415,7 +426,8 @@ bool KVServer::handleMessage(int socket_fd)
 	// Handle a closed connection
 	if (message_size == 0)
 	{
-		cout << "Need to close the connection for socket FD: " << socket_fd << endl;
+		if (DEBUG_MODE)
+			cout << "Need to close the connection for socket FD: " << socket_fd << endl;
 
 		if (ASYNC_MODE)
 		{
@@ -451,22 +463,26 @@ bool KVServer::handleMessage(int socket_fd)
 		string response;
 		if (requestType == "GET")
 		{
-			cout << "received Get request";
+			if (DEBUG_MODE)
+				cout << "received Get request";
 			string value = string();
 
 			bool inTable = KVServer::cache->get_value(key, value);
 
 			if (inTable == false) {
 				response = KVServer::createResponseJson("GET", key, "", 404);
-				cout << endl << "Key Not Found." << endl;
+				if (DEBUG_MODE)
+					cout << endl << "Key Not Found." << endl;
 			} else {
 				response = KVServer::createResponseJson("GET", key, value, 200);
-				cout << endl << "Key found: " << value << endl;
+				if (DEBUG_MODE)
+					cout << endl << "Key found: " << value << endl;
 			}
 		}
 		else if (requestType == "POST")
 		{
-			cout << "received POST request";
+			if (DEBUG_MODE)
+				cout << "received POST request";
 
 			string value;
 			if (request["value"].is_string())
@@ -482,7 +498,8 @@ bool KVServer::handleMessage(int socket_fd)
 		// Return the result to the client
 		KVServer::sendMessageToSocket(response, socket_fd);
 
-		KVServer::cache->print_contents();
+		if (DEBUG_MODE)
+			KVServer::cache->print_contents();
 	}
 
 	return true;

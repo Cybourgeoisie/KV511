@@ -37,6 +37,9 @@ class KVServer
 		// Socket descriptors used for select()
 		fd_set socket_descriptors;
 
+		// Keep track of performance details
+		vector<string> * perf_cp;
+
 public:
 		KVServer();
 		void start(bool use_async);

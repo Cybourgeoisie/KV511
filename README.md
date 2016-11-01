@@ -2,41 +2,23 @@
 A key-value store implemented with a client-server model.
 
 # Requirements:
-- Docker (CLI preferred)
 - Make
+- G++ 4.9
 
 # About the JSON Parser
 JSON parser is a C++ library provided here: https://github.com/nlohmann/json
 
-# Developing and Testing
-Build and run the Docker containers, then you can use your preferred code editor to modify the program. The Docker containers link their internal volumes to the folders that contain our code, so we can make changes without having to rebuild and redeploy Docker - the changes take place instantly, and we can use g++ within the containers to build using the same configurations on both of our machines and the same configuration that will be used on production.
-
-# Why Use Docker?
-Docker provides a portable development and production environment, so that we can build the applications on our own machines and then deploy to AWS without fear or repurcussions of mis-configurations.
-
-Once we're ready to start deploying on AWS, Amazon has automatic tools to let us build new versions of the Docker containers, push them directly to AWS, and then deploy on the spot.
-
-# How to Use Docker
-There is a Makefile that consolidates the most common commands - building the docker containers, running them, stopping them, and attaching to them so that we can develop and debug.
-
-## Building
-From the root directory, just run `make build`
-
-## Running the VMs
-`make run`
-
-## Stopping the VMs
-`make stop`
-
-## Attaching to any of the three VMs
-- `make client` - attach to the client
-- `make front` - attach to the server front-end
-- `make back` - attach to the server back-end (not used until P2)
-
 ## Design
 ###Client Design
+The client is a multi-threaded program running separately from the server. It creates a connection with the server and then issues a sequence of sessions - each consisting of a series of get or post requests. The client receives responses from the server, but at this point does carry out any action with the response. The client threads use blocking network IO in their connection with the server.
+Upon starting up, clients read in a configuration file containing the connection info needed to connect to the server as well as the number of threads to spawn to handle requests. The existing client implementation includes functionality to call a script on the client machine, primarily to generate sessions, but could be extended to allow the client to be plugged into an existing application to enable network key/value storage.
 
-###Server Design
+###Server Front-End Design
+The server front end runs in two different modes: multithreaded with blocking network IO and single-threaded with asynchronous network IO. The multithreaded mode uses pthreads to achieve our goals. The server front end provides a simple request API handling post and get requests and responding appropriately. At this point, the server data store is an in-memory hashmap.
+
+Upon initializing, the server front-end begins listening on port 56789. If running in multithreaded mode, the main thread creates a new server thread to handle that connection. A MAX_SESSIONS variable defines the maximum number of allowable simultaneous connections if the number of requesting threads exceeds this value, the server will issue a not accepting connections error but continue handling existing connections. In single-thread mode, the main thread handles the connection itself.
+
+
 ####Data Store
 At this point, the server provides an in-memory cache of the key-value pairings. This is currently implemented with a C++ unordered map. The key/value pairs are strings.
 ###Communication Protocol
@@ -64,6 +46,16 @@ Start the client
 
 ~~~
 cd KV511/client-front
-./client.o <config-file> // config file specifies ip address and port to connect to
+./client.o <config-file> // config file specifies ip address and port to connect to, as well as spec type and thread count
 ~~~
 
+Client Config Specification:
+
+~~~
+Pull in data by the expected input
+<ip address/localhost> <port number> <specification type> <number of threads>
+Specification types are as follows:
+0 - purely debugging, single threaded, send a few sessions
+1 - "type 1" defined on page 4; single thread, ~100 sessions
+2 - "type 2" defined on page 4; <Method still TBD>
+~~~

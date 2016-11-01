@@ -15,6 +15,7 @@ using namespace nlohmann;
 KVClientThread::KVClientThread(KVConnectionDetails * conn_details)
 {
 	details = conn_details;
+	perf_cp = new vector<string>();
 }
 
 void KVClientThread::sendRequests()
@@ -35,15 +36,24 @@ void KVClientThread::sendRequests()
 	command.append(to_string(SESSION_LENGTH));
 	command.append(" ");
 	command.append(fileName);
-	cout << "Generated filename: " << command << endl;
+
+	if (DEBUG_MODE)
+		cout << "Generated filename: " << command << endl;
 
 	KVApi * api = new KVApi(details);
-	for (int i = 0; i < 3; i++)
+
+	// TIMING START
+	performance_checkpoint(perf_cp, "ball");
+
+	for (int i = 0; i < 10; i++)
 	{
+		performance_checkpoint(perf_cp, "bsession");
+
 		// Open the connection, send the session's requests
 		if (api->open())
 		{
-			cout << "Connection made." << endl;
+			if (DEBUG_MODE)
+				cout << "Connection made." << endl;
 
 			// Run the Python script
 			system(command.c_str());
@@ -94,9 +104,14 @@ void KVClientThread::sendRequests()
 
 		// Need to sleep at least a little bit, otherwise the Async server
 		// could starve threads (currently accessing sockets linearly)
-		usleep(10000); // 10 ms
+		//usleep(10000); // 10 ms
 		//sleep(1);
+
+		performance_checkpoint(perf_cp, "esession");
 	}
+
+	performance_checkpoint(perf_cp, "eall");
+	print_checkpoints_to_file(perf_cp, "ct_" + threadId);
 
 	cout << "-- Thread ID " << threadId << " finished --" << endl;
 }

@@ -10,6 +10,9 @@ class KVServerThread
 		// Sockets
 		int socket_fd;
 
+		// Keep track of performance details
+		vector<string> * perf_cp;
+
 	public:
 		KVServerThread(int);
 
