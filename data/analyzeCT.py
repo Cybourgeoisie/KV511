@@ -11,7 +11,7 @@ def rotate(l, n):
 directoryList = os.listdir(sys.argv[1])
 files = []
 for entry in directoryList:
-	if entry[-4:] == '.txt':
+	if entry[-4:] == '.txt' and entry[:2] == 'ct':
 		files.append(entry)
 data = []
 
@@ -36,6 +36,6 @@ for file in files:
 	finally:
 		f.close()
 
-with open('output.csv', 'w+') as fw:
+with open('outputCT.csv', 'w+') as fw:
 	writer = csv.writer(fw)
 	writer.writerows(data)
