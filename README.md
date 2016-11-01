@@ -10,6 +10,8 @@ JSON parser is a C++ library provided here: https://github.com/nlohmann/json
 
 ## Design
 ###Client Design
+The client is a multi-threaded program running separatly from the server. It creates a connection with the server and then issues a sequence of sessions - each consisting of a series of get or post requests. The client receives responses from the server, but at this point does carry out any action with the response. The client threads use blocking network IO in their connection with the server.
+Upon starting up, clients read in a configuration file containing the connection info needed to connect to the server as well as the number of threads to spawn to handle requests. The existing client implementation includes functionality to call a script on the client machine, primarily to generate sessions, but could be extended to allow the client to be plugged into an existing application to enable network key/value storage.
 
 ###Server Design
 ####Data Store
