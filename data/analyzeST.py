@@ -20,9 +20,9 @@ for file in files:
 		reader = csv.reader(f, delimiter=" ",dialect=csv.excel_tab)
 		for row in reader:
 			if len(row)==2:
-				if row[0][0] == 'b':
+				if row[0] == 'bmessage':
 					starts.append(row[1])
-				if row[0][0] == 'e':
+				if row[0] == 'emessage':
 					ends.append(row[1])
 		results = [int(a_i) - int(b_i) for a_i, b_i in zip(ends, starts)]
 		results.insert(0, file)
