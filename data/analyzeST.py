@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-#consolidate.py
 import csv
 import sys
 import os
