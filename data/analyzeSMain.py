@@ -20,14 +20,14 @@ for file in files:
 		reader = csv.reader(f, delimiter = " ", dialect = csv.excel_tab)
 		for row in reader:
 			if len(row) == 3:
-				if row[0][0] == 'b':
+				if row[0] == 'bsocket':
 					if row[1] not in starts:
 						starts[row[1]] = int(row[2])
 						happens[row[1]] = 1
 					else:
 						starts[row[1]] = starts[row[1]] + int(row[2])
 						happens[row[1]] = happens[row[1]] + 1
-				if row[0][0] == 'e':
+				if row[0] == 'esocket':
 					if row[1] not in ends:
 						ends[row[1]] = int(row[2])
 					else:
