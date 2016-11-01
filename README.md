@@ -64,6 +64,6 @@ Start the client
 
 ~~~
 cd KV511/client-front
-./client.o <config-file> // config file specifies ip address and port to connect to
+./client.o <config-file> // config file specifies ip address and port to connect to, as well as spec type and thread count
 ~~~
 
