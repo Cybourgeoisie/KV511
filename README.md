@@ -42,6 +42,14 @@ cd KV511/server-front
 ./server.o 1 //for asynch version
 ~~~
 
+Quitting the server
+
+~~~
+`q`
+
+By entering "q" and hitting enter, the user can quit the server program.
+~~~
+
 Start the client
 
 ~~~
@@ -49,13 +57,19 @@ cd KV511/client-front
 ./client.o <config-file> // config file specifies ip address and port to connect to, as well as spec type and thread count
 ~~~
 
+Quitting the client
+
+~~~
+`q`
+
+By entering "q" and hitting enter, the user can quit the client program.
+~~~
+
 Client Config Specification:
 
 ~~~
 Pull in data by the expected input
 <ip address/localhost> <port number> <specification type> <number of threads>
-Specification types are as follows:
-0 - purely debugging, single threaded, send a few sessions
-1 - "type 1" defined on page 4; single thread, ~100 sessions
-2 - "type 2" defined on page 4; <Method still TBD>
+
+Right now, the specification type does not actually change the output of the program. However, the number of threads can determine whether the program acts as "type 1" or "type 2".
 ~~~

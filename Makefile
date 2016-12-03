@@ -1,4 +1,12 @@
-default: tar
+default: clean tar
+
+clean:
+	rm ./server-front/.* \
+		./client-front/.* \
+		./libs/.* \
+		./server-front/.* \
+		./client-front/.* \
+		./libs/.*
 
 tar:
 	tar cvfz KV511.tgz \
@@ -11,7 +19,8 @@ tar:
 		./libs/*.py \
 		./server-front/Makefile \
 		./client-front/Makefile \
-		./checkpoints/
+		./README.pdf \
+		./paper/cse511-p1.pdf
 
 untar:
 	tar 
