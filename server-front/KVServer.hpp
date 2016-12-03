@@ -3,7 +3,8 @@
 
 // Our local cache
 #include "../libs/KVCommon.hpp"
-#include "../libs/KVCache.hpp"
+//#include "../libs/KVCache.hpp"
+#include "../libs/LRU_Cache.hpp"
 #include "KVServerThread.hpp"
 
 using namespace std;
@@ -55,7 +56,9 @@ public:
 		static bool handleMessage(int);
 
 		// Our KV cache
-		static KVCache * cache;
+		// static KVCache * cache;
+		// Now a LRU cache
+		static cache::LRU_Cache<string, string> * cache;
 
 		// Keep track of the sockets that need to be freed
 		static vector<int> sockets_to_close;

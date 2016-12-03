@@ -4,14 +4,16 @@
 
 #include "KVServer.hpp"
 #include "../libs/KVCommon.cpp"
-#include "../libs/KVCache.cpp"
+//#include "../libs/KVCache.cpp"
+#include "../libs/LRU_Cache.hpp"
 #include "KVServerThread.cpp"
 
 /**
  * Public Methods
  */
 
-KVCache * KVServer::cache = new KVCache();
+// KVCache * KVServer::cache = new KVCache();
+cache::LRU_Cache<string, string> * KVServer::cache = new cache::LRU_Cache<string, string>(10);
 vector<int> KVServer::sockets_to_close;
 
 int KVServer::BUFFER_SIZE = 513; // Size given in bytes
@@ -467,7 +469,7 @@ bool KVServer::handleMessage(int socket_fd)
 				cout << "received Get request";
 			string value = string();
 
-			bool inTable = KVServer::cache->get_value(key, value);
+			bool inTable = KVServer::cache->exists(key);
 
 			if (inTable == false) {
 				response = KVServer::createResponseJson("GET", key, "", 404);
@@ -490,16 +492,13 @@ bool KVServer::handleMessage(int socket_fd)
 			else if (request["value"].is_number())
 				value = to_string(request["value"].get<int>());
 			
-			bool success = KVServer::cache->post_value(key, value);
+			bool success = KVServer::cache->put(key, value);
 
 			response = KVServer::createResponseJson("POST", key, value, 200);
 		}
 
 		// Return the result to the client
 		KVServer::sendMessageToSocket(response, socket_fd);
-
-		if (DEBUG_MODE)
-			KVServer::cache->print_contents();
 	}
 
 	return true;
