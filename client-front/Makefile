@@ -8,4 +8,4 @@ client: client.cpp
 	$(CXX) -pg -pthread -std=c++0x client.cpp -o client.o
 
 clean:
-	$(RM) -r client.o client.o.dSYM
+	$(RM) -r client.o client.o.dSYM *_Session

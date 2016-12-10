@@ -469,16 +469,19 @@ bool KVServer::handleMessage(int socket_fd)
 				cout << "received Get request";
 			string value = string();
 
-			bool inTable = KVServer::cache->exists(key);
+			try
+			{
+				value = KVServer::cache->get(key);
 
-			if (inTable == false) {
-				response = KVServer::createResponseJson("GET", key, "", 404);
-				if (DEBUG_MODE)
-					cout << endl << "Key Not Found." << endl;
-			} else {
 				response = KVServer::createResponseJson("GET", key, value, 200);
 				if (DEBUG_MODE)
 					cout << endl << "Key found: " << value << endl;
+			}
+			catch (exception e)
+			{
+				response = KVServer::createResponseJson("GET", key, "", 404);
+				if (DEBUG_MODE)
+					cout << endl << "Key Not Found." << endl;
 			}
 		}
 		else if (requestType == "POST")
