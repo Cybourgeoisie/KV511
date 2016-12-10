@@ -1,27 +1,20 @@
-#ifndef KVSERVER_H
-#define KVSERVER_H
+#ifndef KVSERVERBACK_H
+#define KVSERVERBACK_H
 
 // Our local cache
+#include <regex>
 #include "../libs/KVCommon.hpp"
-//#include "../libs/KVCache.hpp"
-#include "../libs/LRU_Cache.hpp"
-#include "../libs/KVApi.hpp"
-#include "KVServerThread.hpp"
 
 using namespace std;
+using namespace nlohmann;
 
-// Mutexes
-static pthread_mutex_t mutex_sockets_to_close = PTHREAD_MUTEX_INITIALIZER;
-
-class KVServer
+class KVServerBack
 {
 	private:
 		void initialize();
-		void runProgram();
 		void resetSocketDescriptors();
 		void handleNewConnectionRequest();
 		void handleExistingConnections();
-		static void * startServerThread(void *);
 
 		// Own socket
 		void openSocket();
@@ -43,8 +36,8 @@ class KVServer
 		vector<string> * perf_cp;
 
 public:
-		KVServer();
-		void start(bool use_async);
+		KVServerBack();
+		void start();
 		void listenForActivity();
 
 		// Remove network connections
@@ -52,19 +45,14 @@ public:
 		void queueSocketToClose(int);
 
 		// Messages
-		static string createResponseJson(string, string, string, int);
+		static string createResponseJson(string, string, string, int, int);
 		static void sendMessageToSocket(string, int);
 		static bool handleMessage(int);
 
-		// Calls to the backend
-		static KVResult_t callBackend(string, string, string);
-		static KVResult_t backendGet(string);
-		static KVResult_t backendPost(string, string);
-
-		// Our KV cache
-		// static KVCache * cache;
-		// Now a LRU cache
-		static cache::LRU_Cache<string, string> * cache;
+		// Retrieve / Save keys
+		static KVResult_t get(string);
+		static KVResult_t post(string, string);
+		static bool exists(string);
 
 		// Keep track of the sockets that need to be freed
 		static vector<int> sockets_to_close;
@@ -72,6 +60,7 @@ public:
 		// "Constant" values
 		static int BUFFER_SIZE;
 		static int INCOMING_MESSAGE_SIZE;
+		static string STORAGE_FILE;
 };
 
 #endif

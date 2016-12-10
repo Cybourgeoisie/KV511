@@ -4,12 +4,6 @@
 using namespace std;
 using namespace nlohmann;
 
-typedef struct {
-	int err;
-	string key;
-	string value;
-} KVApiResult_t;
-
 class KVApi
 {
 	private:
@@ -34,7 +28,7 @@ class KVApi
         string createRequestJson(string, string, string);
 
         string send(string);
-        KVApiResult_t parseResponse(string);
+        KVResult_t parseResponse(string);
 
 	public:
 
@@ -42,8 +36,8 @@ class KVApi
 
 		// API
 		bool open();
-		KVApiResult_t get(string);
-		KVApiResult_t post(string, string);
+		KVResult_t get(string);
+		KVResult_t post(string, string);
 		bool close();
 };
 

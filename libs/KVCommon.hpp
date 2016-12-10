@@ -44,6 +44,13 @@ typedef struct {
 	int port;
 } KVConnectionDetails;
 
+typedef struct {
+	int    err;
+	int    version;
+	string key;
+	string value;
+} KVResult_t;
+
 class KVCommon
 {
 	public:
@@ -55,6 +62,7 @@ class KVCommon
 		static string trimWhitespace(string);
 		static void clearScreen();
 };
+
 std::string get_file_contents(const char *);
 
 #define SESSION_LENGTH 10

@@ -2,30 +2,23 @@
  * Distributed Key-Value Store server class
  */
 
-#include "KVServer.hpp"
+#include "KVServerBack.hpp"
 #include "../libs/KVCommon.cpp"
-#include "../libs/LRU_Cache.hpp"
-#include "../libs/KVApi.cpp"
-#include "KVServerThread.cpp"
 
 /**
  * Public Methods
  */
 
-// KVCache * KVServer::cache = new KVCache();
-cache::LRU_Cache<string, string> * KVServer::cache = new cache::LRU_Cache<string, string>(10);
-vector<int> KVServer::sockets_to_close;
+vector<int> KVServerBack::sockets_to_close;
 
-int KVServer::BUFFER_SIZE = 513; // Size given in bytes
-int KVServer::INCOMING_MESSAGE_SIZE = KVServer::BUFFER_SIZE - 1;
+int KVServerBack::BUFFER_SIZE = 513; // Size given in bytes
+int KVServerBack::INCOMING_MESSAGE_SIZE = KVServerBack::BUFFER_SIZE - 1;
+string KVServerBack::STORAGE_FILE = "storage.txt"; // Storage file name
 
-// Be aware of the global var provided by server.cpp
-extern bool ASYNC_MODE;
-
-KVServer::KVServer()
+KVServerBack::KVServerBack()
 {
 	// Define the port number to listen through
-	PORT_NUMBER = 56789;
+	PORT_NUMBER = 56790;
 
 	// Define server limits
 	MAX_SESSIONS = 512;
@@ -37,16 +30,8 @@ KVServer::KVServer()
 	perf_cp = new vector<string>();
 }
 
-void KVServer::start(bool use_async)
+void KVServerBack::start()
 {
-	// Determine if we want to use MT
-	ASYNC_MODE = use_async;
-
-	if (ASYNC_MODE)
-		cout << "Running server in Async mode." << endl;
-	else
-		cout << "Running server in MT mode." << endl;
-
 	// Open the socket and listen for connections
 	initialize();
 	openSocket();
@@ -55,18 +40,11 @@ void KVServer::start(bool use_async)
 	listenForActivity();
 }
 
-void * KVServer::startServerThread(void * arg)
-{
-	KVServerThread * thread = new KVServerThread((long) arg);
-	thread->listenForActivity();
-	pthread_exit(NULL);
-}
-
 /**
  * Private Methods
  */
 
-void KVServer::initialize()
+void KVServerBack::initialize()
 {
 	// Ensure that all sockets are invalid to boot (if using MT)
 	for (int i = 0; i < MAX_SESSIONS; i++)
@@ -85,7 +63,7 @@ void KVServer::initialize()
  * - Open and bind a socket to serve
  */
 
-void KVServer::openSocket()
+void KVServerBack::openSocket()
 {
 	// Create the socket - use SOCK_STREAM for TCP, SOCK_DGRAM for UDP
 	primary_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -105,16 +83,14 @@ void KVServer::openSocket()
         exit(1);
     }
 
-	// Async only: set to non-blocking
-	if (ASYNC_MODE)
+    /* ASYNC
+	if (ioctl(primary_socket, FIONBIO, (char *)&opt) < 0)
 	{
-		if (ioctl(primary_socket, FIONBIO, (char *)&opt) < 0)
-		{
-			perror("Error: ioctl() failed to make primary socket non-blocking");
-			close(primary_socket);
-			exit(-1);
-		}
+		perror("Error: ioctl() failed to make primary socket non-blocking");
+		close(primary_socket);
+		exit(-1);
 	}
+	*/
 
 	// Bind to the given socket
 	int socket_status = this->bindSocket(primary_socket);
@@ -135,7 +111,7 @@ void KVServer::openSocket()
 		cout << "Listening on port " << PORT_NUMBER << endl;
 }
 
-int KVServer::bindSocket(int socket)
+int KVServerBack::bindSocket(int socket)
 {
 	struct sockaddr_in server_address;
 
@@ -150,7 +126,7 @@ int KVServer::bindSocket(int socket)
 	return ::bind(socket, (struct sockaddr *) &server_address, sizeof(server_address));
 }
 
-void KVServer::listenForActivity()
+void KVServerBack::listenForActivity()
 {
 	if (DEBUG_MODE)
 		KVCommon::clearScreen();
@@ -160,24 +136,14 @@ void KVServer::listenForActivity()
 		// Ready the socket descriptors
 		this->resetSocketDescriptors();
 
-		// Determine if we're listening to all ports or just the primary
+		// Wait for activity - all sockets
 		int activity;
-		if (ASYNC_MODE)
-		{
-			// Wait for activity - all sockets
-			activity = select(max_connection + 1, &socket_descriptors, NULL, NULL, NULL);
-		}
-		else
-		{
-			// Wait for activity - only STDIN and primary socket
-			// (STDIN usually has 0 reserved, and a custom socket is given a higher number)
-			activity = select(primary_socket + 1, &socket_descriptors, NULL, NULL, NULL);
-		}
+		activity = select(max_connection + 1, &socket_descriptors, NULL, NULL, NULL);
 
 		// Validate the activity
 		if ((activity < 0) && (errno!=EINTR))
 		{
-			if (ASYNC_MODE && (errno == EAGAIN || errno == EWOULDBLOCK))
+			if (errno == EAGAIN || errno == EWOULDBLOCK)
 			{
 				cout << "** Notice ** Non-blocking error response." << endl;
 				continue;
@@ -214,7 +180,7 @@ void KVServer::listenForActivity()
 				exit(1);
 			}
 		}
-		else if (ASYNC_MODE)
+		else
 		{
 			// Anything on the primary socket is a new connection
 			if (FD_ISSET(primary_socket, &socket_descriptors))
@@ -225,15 +191,10 @@ void KVServer::listenForActivity()
 			// Perform any open activities on all other clients
 			this->handleExistingConnections();
 		}
-		else
-		{
-			// In MT mode, the primary only handles new connection requests
-			this->handleNewConnectionRequest();
-		}
 	}
 }
 
-void KVServer::sendMessageToSocket(string request, int socket) {
+void KVServerBack::sendMessageToSocket(string request, int socket) {
     //write the message to the client socket
     if (write(socket, request.c_str(), request.length()) < 0){
         perror("Error: could not send message to client");
@@ -241,11 +202,12 @@ void KVServer::sendMessageToSocket(string request, int socket) {
     }
 }
 
-string KVServer::createResponseJson(string type, string key, string value, int code) {
+string KVServerBack::createResponseJson(string type, string key, string value, int version, int code) {
     json response;
     response["type"] = type;
     response["key"] = key;
     response["value"] = value;
+    response["version"] = version;
     response["code"] = code;
     return response.dump();
 }
@@ -255,25 +217,14 @@ string KVServer::createResponseJson(string type, string key, string value, int c
  * Handle Connection Activity
  */
 
-void KVServer::resetSocketDescriptors()
+void KVServerBack::resetSocketDescriptors()
 {
 	// Determine if we have any sockets to close
 	vector<int> copy_of_sockets_to_close;
 
-	if (ASYNC_MODE)
-	{
-		// For (1) fair comparison with MT, and (2) to keep code cleaner
-		copy_of_sockets_to_close = KVServer::sockets_to_close; // Make a copy of the data
-		KVServer::sockets_to_close.clear(); // Empty the sockets to close
-	}
-	else
-	{
-		// Trying to do as little work as possible here... Just copy and clear.
-		pthread_mutex_lock(&mutex_sockets_to_close);
-		copy_of_sockets_to_close = KVServer::sockets_to_close; // Make a copy of the data
-		KVServer::sockets_to_close.clear(); // Empty the sockets to close
-		pthread_mutex_unlock(&mutex_sockets_to_close);
-	}
+	// For (1) fair comparison with MT, and (2) to keep code cleaner
+	copy_of_sockets_to_close = KVServerBack::sockets_to_close; // Make a copy of the data
+	KVServerBack::sockets_to_close.clear(); // Empty the sockets to close
 
 	// Close those sockets ready to close.
 	while (copy_of_sockets_to_close.size() > 0)
@@ -309,7 +260,7 @@ void KVServer::resetSocketDescriptors()
 	}
 }
 
-void KVServer::handleNewConnectionRequest()
+void KVServerBack::handleNewConnectionRequest()
 {
 	// Prepare the client address
 	struct sockaddr_in client_address;
@@ -367,24 +318,11 @@ void KVServer::handleNewConnectionRequest()
 		sockets[i] = new_socket;
 
 		performance_checkpoint(perf_cp, "bsocket " + to_string(new_socket));
-
-		// Only need to worry about MT here - async's work is set with the sockets[] array
-		if (!ASYNC_MODE)
-		{
-			// MT - create a new thread, pass off the socket to it
-			pthread_t node_thread;
-			if (pthread_create(&node_thread, NULL, &KVServer::startServerThread, (void *) new_socket) != 0)
-			{
-				perror("Error: could not spawn peer listeners");
-				exit(1);
-			}			
-		}
-
 		break;
 	}
 }
 
-void KVServer::handleExistingConnections()
+void KVServerBack::handleExistingConnections()
 {
 	// Prepare the client address
 	struct sockaddr_in client_address;
@@ -396,12 +334,12 @@ void KVServer::handleExistingConnections()
 		if (!FD_ISSET(sockets[i], &socket_descriptors)) continue;
 
 		performance_checkpoint(perf_cp, "bmessage");
-		KVServer::handleMessage(sockets[i]);
+		KVServerBack::handleMessage(sockets[i]);
 		performance_checkpoint(perf_cp, "emessage");
 	}
 }
 
-bool KVServer::handleMessage(int socket_fd)
+bool KVServerBack::handleMessage(int socket_fd)
 {
 	// Handle the buffer
 	char * buffer = new char[BUFFER_SIZE];
@@ -431,16 +369,7 @@ bool KVServer::handleMessage(int socket_fd)
 		if (DEBUG_MODE)
 			cout << "Need to close the connection for socket FD: " << socket_fd << endl;
 
-		if (ASYNC_MODE)
-		{
-			KVServer::sockets_to_close.push_back(socket_fd);
-		}
-		else
-		{
-			pthread_mutex_lock(&mutex_sockets_to_close);
-			KVServer::sockets_to_close.push_back(socket_fd);
-			pthread_mutex_unlock(&mutex_sockets_to_close);
-		}
+		KVServerBack::sockets_to_close.push_back(socket_fd);
 
 		return false;
 	}
@@ -467,30 +396,9 @@ bool KVServer::handleMessage(int socket_fd)
 		{
 			if (DEBUG_MODE)
 				cout << "received Get request";
-			string value = string();
 
-			try
-			{
-				// Search the cache
-				value = KVServer::cache->get(key);
-				response = KVServer::createResponseJson("GET", key, value, 200);
-
-				// Found the value
-				if (DEBUG_MODE)
-					cout << endl << "Key found: " << value << endl;
-			}
-			catch (exception e)
-			{
-				// Call the backend here
-				KVResult_t result = KVServer::backendGet(key);
-				response = KVServer::createResponseJson("GET", key, result.value, result.err);
-
-				// If the error is still 404, then that's that..
-				if (DEBUG_MODE && result.err == 404)
-					cout << endl << "Key Not Found on Backend Server." << endl;
-				else if (DEBUG_MODE && result.err == 200)
-					cout << endl << "Key Found on Backend Server." << endl;
-			}
+			KVResult_t result = KVServerBack::get(key);
+			response = KVServerBack::createResponseJson("GET", result.key, result.value, result.version, result.err);
 		}
 		else if (requestType == "POST")
 		{
@@ -503,77 +411,172 @@ bool KVServer::handleMessage(int socket_fd)
 			else if (request["value"].is_number())
 				value = to_string(request["value"].get<int>());
 
-			// Call the backend here
-			KVResult_t result = KVServer::backendPost(key, value);
-
-			// Now update the cache
-			bool success = KVServer::cache->put(key, value);
-
-			// Return to the front
-			response = KVServer::createResponseJson("POST", key, value, 200);
+			KVResult_t result = KVServerBack::post(key, value);
+			response = KVServerBack::createResponseJson("POST", result.key, result.value, result.version, result.err);
 		}
 
 		// Return the result to the client
-		KVServer::sendMessageToSocket(response, socket_fd);
+		KVServerBack::sendMessageToSocket(response, socket_fd);
 	}
 
 	return true;
 }
 
-
-KVResult_t KVServer::backendGet(string key)
+KVResult_t KVServerBack::get(string key)
 {
-	return KVServer::callBackend("localhost", key, "");
-}
-
-KVResult_t KVServer::backendPost(string key, string value)
-{
-	return KVServer::callBackend("localhost", key, value);
-}
-
-KVResult_t KVServer::callBackend(string address, string key, string value)
-{
-	// Backend calling details
-	KVConnectionDetails details;
-	details.address = address;
-	details.port = 56790;
-
-	KVApi * api = new KVApi(&details);
 	KVResult_t result;
+	result.key = key;
+	result.err = 404; // Default: Not Found
+	result.version = 0;
+	result.value = "";
 
-	// Make the beginning of a call
-	//performance_checkpoint(perf_cp, "bbackendcall");
+	// Return key, version, value
+	ifstream is;
 
-	// Open the connection, send the session's requests
-	if (api->open())
+	// Prepare the key for search	
+	ostringstream os;
+	os << key << " ";
+	string s_key = os.str();
+
+	// Open the file to search
+	is.open(STORAGE_FILE, ios::binary);
+
+	// Find the line
+	string line;
+	while (getline(is, line))
 	{
-		if (DEBUG_MODE)
-			cout << "Connection made." << endl;
-
-		if (value.empty())
+		// See if the keys match
+		if (line.find(s_key) == 0)
 		{
-			result = api->get(key);
+			// Get the version number and value
+			smatch m;
+			regex e("^([0-9]{1,}) ([0-9]{1,}) (.*)$");
+			if (regex_search(line, m, e))
+			{
+				// Get the version number
+				int version = stoi(m.str(2));
+
+				// Get the value
+				string value = m.str(3);
+
+				result.err = 200; // Found
+				result.version = version;
+				result.value = value;
+
+				// Close the file stream and return the value
+				is.close();
+				return result;
+			}
 		}
-		else
+	}
+
+	is.close();
+	return result;
+}
+
+KVResult_t KVServerBack::post(string key, string value)
+{
+	KVResult_t result;
+	result.value = value;
+	result.key = key;
+	result.err = 200;
+
+	// Well, C++ requires writing a new file every time we need to update a part of it, so...
+	// See if the key is already in storage
+	if (KVServerBack::exists(key))
+	{
+		// Prepare the new filename
+		ostringstream os_name;
+		os_name << STORAGE_FILE << ".tmp";
+		string new_filename = os_name.str();
+
+		// Prepare the key for search
+		ostringstream os_key;
+		os_key << key << " ";
+		string s_key = os_key.str();
+
+		// Write to the file
+		ofstream os;
+		os.open(new_filename, ios::app);
+
+		// Read the file
+		ifstream is;
+		is.open(STORAGE_FILE, ios::binary);
+
+		// Copy the file line by line
+		string line;
+		while (getline(is, line))
 		{
-			result = api->post(key, value);
+			// See if the keys match
+			if (line.find(s_key) == 0)
+			{
+				// Get the version number and value
+				smatch m;
+				regex e("^([0-9]{1,}) ([0-9]{1,}) (.*)$");
+				if (regex_search(line, m, e))
+				{
+					// Get the version number, add one to it
+					int version = stoi(m.str(2)) + 1;
+
+					// Update the result
+					result.version = version;
+
+					// Write the new value and version number
+					os << key << " " << version << " " << value << endl;
+				}
+			}
+			else
+			{
+				// Just write the line
+				os << line << endl;
+			}
 		}
 
-		api->close();
+		// When we're done, close and move
+		os.close();
+		is.close();
+		rename(new_filename.c_str(), STORAGE_FILE.c_str());
 	}
 	else
 	{
-		cout << "Could not make a connection";
+		// Otherwise append
+		ofstream os;
+		os.open(STORAGE_FILE, ios::app);
+		os << key << " 1 " << value << endl; // Version 1
+
+		result.version = 1;
 	}
 
-	// Need to sleep at least a little bit, otherwise the Async server
-	// could starve threads (currently accessing sockets linearly)
-	//usleep(10000); // 10 ms
-	//sleep(1);
-
-	//performance_checkpoint(perf_cp, "esession");
-
 	return result;
+}
+
+bool KVServerBack::exists(string key)
+{
+	// Return key, version, value
+	ifstream is;
+
+	// Prepare the key for search	
+	ostringstream os;
+	os << key << " ";
+	string s_key = os.str();
+
+	// Open the file to search
+	is.open(STORAGE_FILE, ios::binary);
+
+	// Find the line
+	string line;
+	while (getline(is, line))
+	{
+		// See if the keys match
+		if (line.find(s_key) == 0)
+		{
+			is.close();
+			return true;
+		}
+	}
+
+	is.close();
+	return false;
 }
 
 
@@ -581,7 +584,7 @@ KVResult_t KVServer::callBackend(string address, string key, string value)
  * Handle closing sockets
  */
 
-void KVServer::closeSocket(int socket)
+void KVServerBack::closeSocket(int socket)
 {
 	// Remove from the int array
 	for (int i = 0; i < MAX_SESSIONS; i++)

@@ -34,7 +34,7 @@ bool KVApi::open()
 	return false;
 }
 
-KVApiResult_t KVApi::get(string key)
+KVResult_t KVApi::get(string key)
 {
 	// Generate the request
 	string request  = createRequestJson("GET", key, "");
@@ -42,7 +42,7 @@ KVApiResult_t KVApi::get(string key)
 	return parseResponse(response);
 }
 
-KVApiResult_t KVApi::post(string key, string value)
+KVResult_t KVApi::post(string key, string value)
 {
 	// Generate the request
 	string request  = createRequestJson("POST", key, value);
@@ -73,14 +73,14 @@ string KVApi::send(string request)
 	return response;
 }
 
-KVApiResult_t KVApi::parseResponse(string s)
+KVResult_t KVApi::parseResponse(string s)
 {
 	// Parse the string
 	json inputJson;
 	inputJson = json::parse(s);
 
 	string key, value;
-	int code;
+	int code = 0, version = 0;
 
 	// Get the key, value, and code
 	if (inputJson["key"].is_string())
@@ -98,10 +98,16 @@ KVApiResult_t KVApi::parseResponse(string s)
 	else if (inputJson["code"].is_number())
 		code = inputJson["code"].get<int>();
 
-	KVApiResult_t * result = new KVApiResult_t();
-	result->key   = key;
-	result->value = value;
-	result->err   = code;
+	if (inputJson["version"].is_string())
+		version = stoi(inputJson["version"].get<string>());
+	else if (inputJson["version"].is_number())
+		version = inputJson["version"].get<int>();
+
+	KVResult_t * result = new KVResult_t();
+	result->key     = key;
+	result->value   = value;
+	result->err     = code;
+	result->version = version;
 	return *result;
 }
 

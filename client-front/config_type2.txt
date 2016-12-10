@@ -1,1 +1,1 @@
-localhost 56789 0 100
+localhost 56789 0 10
