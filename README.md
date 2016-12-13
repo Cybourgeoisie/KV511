@@ -93,3 +93,8 @@ Pull in data by the expected input
 
 Right now, the specification type does not actually change the output of the program. However, the number of threads can determine whether the program acts as "type 1" or "type 2".
 ~~~
+
+###External Libraries Used
+https://github.com/lamerman/cpp-lru-cache
+
+https://github.com/nlohmann/json
