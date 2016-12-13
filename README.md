@@ -22,8 +22,10 @@ Upon initializing, the server front-end begins listening on port 56789. If runni
 
 The server front end utilizes a quorum-based replication scheme where all writes are replicated to at least W nodes, while all reads are retrieved from at least R nodes with the highest version number having priority. R+W > N, W > N/2.
 
-###Server Back-End Design
+The front end periodically sends a heart beat request to the back ends to determine if they are still behaving usually. If they are not, the front end terminates the connection with the misbehaving host. If the number of available back end hosts falls below R or W, the front end should shut down.
 
+###Server Back-End Design
+The back end employs quorum based replication. Persistant data storage is accomplished via the local filesystems of the nodes running in the back end.
 
 ####Data Store
 The front-end provides an in-memory cache of the key-value pairings with a least recently used replacement policy. This is currently implemented with a C++ unordered map and a linked list. The key/value pairs are strings.
