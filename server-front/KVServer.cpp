@@ -19,6 +19,11 @@ vector<int> KVServer::sockets_to_close;
 int KVServer::BUFFER_SIZE = 513; // Size given in bytes
 int KVServer::INCOMING_MESSAGE_SIZE = KVServer::BUFFER_SIZE - 1;
 
+int KVServer::WRITE_QUORUM;
+int KVServer::READ_QUORUM;
+int KVServer::NUM_NODES;
+vector<KVBackendServer_t> KVServer::NODE_ADDRESSES;
+
 // Be aware of the global var provided by server.cpp
 extern bool ASYNC_MODE;
 
@@ -35,6 +40,33 @@ KVServer::KVServer()
 
 	// Keep track of performance details
 	perf_cp = new vector<string>();
+
+	// Set up the node addresses
+	vector< vector<string> > addresses = {
+		{"localhost", "56790"},
+		{"localhost", "56791"},
+		{"localhost", "56792"},
+		{"localhost", "56793"},
+		{"localhost", "56794"},
+		{"localhost", "56795"}
+	};
+
+	for (vector< vector<string> >::iterator it = addresses.begin(); it != addresses.end(); ++it)
+	{
+		// Add a new node
+		KVBackendServer_t backend_server;
+		backend_server.address = (*it)[0];
+		backend_server.port    = (*it)[1];
+		backend_server.alive   = true;
+
+		// Add to the active list
+		NODE_ADDRESSES.push_back(backend_server);
+	}
+
+	// Update our quorums
+	KVServer::NUM_NODES    = (int)(NODE_ADDRESSES.size());
+	KVServer::WRITE_QUORUM = (int)(NODE_ADDRESSES.size() / 2) + 1;
+	KVServer::READ_QUORUM  = (int)(NODE_ADDRESSES.size() / 2);
 }
 
 void KVServer::start(bool use_async)
@@ -447,7 +479,18 @@ bool KVServer::handleMessage(int socket_fd)
 	else
 	{
 		//parse message and execute accordingly
-		json request = json::parse(buffer);
+		json request;
+		try
+		{
+			request = json::parse(buffer);
+		}
+		catch (exception ex)
+		{
+			string response = KVServer::createResponseJson("INVALID", "", "", 400);
+			KVServer::sendMessageToSocket(response, socket_fd);
+			return false;
+		}
+
 		if (DEBUG_MODE) {
 			cout << request.dump(4) << endl;
 		}
@@ -489,7 +532,12 @@ bool KVServer::handleMessage(int socket_fd)
 				if (DEBUG_MODE && result.err == 404)
 					cout << endl << "Key Not Found on Backend Server." << endl;
 				else if (DEBUG_MODE && result.err == 200)
-					cout << endl << "Key Found on Backend Server." << endl;
+				{
+					cout << endl << "Key Found on Backend Server -> Updating Cache" << endl;
+
+					// Now update the cache
+					bool success = KVServer::cache->put(key, result.value);
+				}
 			}
 		}
 		else if (requestType == "POST")
@@ -523,20 +571,121 @@ bool KVServer::handleMessage(int socket_fd)
 
 KVResult_t KVServer::backendGet(string key)
 {
-	return KVServer::callBackend("localhost", key, "");
+	// Keep track of the best result
+	KVResult_t latest_result;
+	latest_result.version = 0;
+
+	int responses = 0;
+	bool read_nodes[NUM_NODES];
+	for (int i = 0; i < NUM_NODES; i++)
+		read_nodes[i] = false;
+
+	while (responses < READ_QUORUM)
+	{
+		int node = (int)(rand() % NUM_NODES);
+		if (read_nodes[node])
+			continue; // Only visit nodes once
+
+		// Update the nodes we just read
+		read_nodes[node] = true;
+
+		// Make sure that the node is alive
+		if (NODE_ADDRESSES[node].alive == false)
+		{
+			// Sleep a bit, then give it a try
+			usleep(1000); // 1 ms
+		}
+
+		// Get the response
+		KVResult_t node_result = KVServer::callBackend(NODE_ADDRESSES[node].address, NODE_ADDRESSES[node].port, key, "", -1);
+
+		// Update the best result
+		if (latest_result.version < node_result.version)
+			latest_result = node_result;
+
+		// If we timeout, then signal that the heartbeat failed
+		if (node_result.err == 400)
+		{
+			// Heartbeat - assume that the node is down.
+			NODE_ADDRESSES[node].alive = false;
+		}
+		else
+		{
+			// Make sure that this node is treated as alive
+			NODE_ADDRESSES[node].alive = true;
+			
+			// Update the responses retrieved
+			responses++;
+		}
+	}
+
+	return latest_result;
 }
 
 KVResult_t KVServer::backendPost(string key, string value)
 {
-	return KVServer::callBackend("localhost", key, value);
+	// First things first.. get the most recent version
+	KVResult_t result  = KVServer::backendGet(key);
+	int version_number = result.version;
+
+	// Keep track of the best result
+	KVResult_t latest_result;
+	latest_result.version = 0;
+
+	int responses = 0;
+	bool write_nodes[NUM_NODES];
+	for (int i = 0; i < NUM_NODES; i++)
+		write_nodes[i] = false;
+
+	while (responses < WRITE_QUORUM)
+	{
+		int node = (int)(rand() % NUM_NODES);
+		if (write_nodes[node])
+			continue; // Only visit nodes once
+
+		// Update the nodes we just read
+		write_nodes[node] = true;
+
+		// Make sure that the node is alive
+		if (NODE_ADDRESSES[node].alive == false)
+		{
+			// Sleep a bit, then give it a try
+			usleep(1000); // 1 ms
+		}
+
+		// Get the response
+		KVResult_t node_result = KVServer::callBackend(NODE_ADDRESSES[node].address, NODE_ADDRESSES[node].port, key, value, version_number);
+
+		// Update the best result
+		if (latest_result.version < node_result.version)
+			latest_result = node_result;
+
+		// If we timeout, then signal that the heartbeat failed
+		if (node_result.err == 400)
+		{
+			// HEARTBEAT
+			// Assume that the node is down.
+			NODE_ADDRESSES[node].alive = false;
+		}
+		else
+		{
+			// Make sure that this node is treated as alive
+			NODE_ADDRESSES[node].alive = true;
+			
+			// Update the responses retrieved
+			responses++;
+		}
+	}
+
+	return latest_result;
 }
 
-KVResult_t KVServer::callBackend(string address, string key, string value)
+KVResult_t KVServer::callBackend(string address, string port, string key, string value, int version)
 {
 	// Backend calling details
 	KVConnectionDetails details;
 	details.address = address;
-	details.port = 56790;
+	details.port = stoi(port);
 
 	KVApi * api = new KVApi(&details);
 	KVResult_t result;
@@ -556,7 +705,7 @@ KVResult_t KVServer::callBackend(string address, string key, string value)
 		}
 		else
 		{
-			result = api->post(key, value);
+			result = api->post(key, value, version);
 		}
 
 		api->close();

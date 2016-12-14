@@ -37,7 +37,7 @@ class KVServerBack
 
 public:
 		KVServerBack();
-		void start();
+		void start(int);
 		void listenForActivity();
 
 		// Remove network connections
@@ -51,7 +51,7 @@ public:
 
 		// Retrieve / Save keys
 		static KVResult_t get(string);
-		static KVResult_t post(string, string);
+		static KVResult_t post(string, string, int);
 		static bool exists(string);
 
 		// Keep track of the sockets that need to be freed

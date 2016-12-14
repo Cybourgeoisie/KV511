@@ -37,16 +37,32 @@ bool KVApi::open()
 KVResult_t KVApi::get(string key)
 {
 	// Generate the request
-	string request  = createRequestJson("GET", key, "");
+	string request  = createRequestJson("GET", key, "", -1);
 	string response = send(request);
+
+	if (response.empty())
+	{
+		KVResult_t bad_result;
+		bad_result.err = 400;
+		return bad_result;
+	}
+
 	return parseResponse(response);
 }
 
-KVResult_t KVApi::post(string key, string value)
+KVResult_t KVApi::post(string key, string value, int version)
 {
 	// Generate the request
-	string request  = createRequestJson("POST", key, value);
+	string request  = createRequestJson("POST", key, value, version);
 	string response = send(request);
+
+	if (response.empty())
+	{
+		KVResult_t bad_result;
+		bad_result.err = 400;
+		return bad_result;
+	}
+
 	return parseResponse(response);
 }
 
@@ -68,8 +84,47 @@ bool KVApi::close()
 
 string KVApi::send(string request)
 {
-	sendMessageToSocket(request, server_socket);
-	string response = listenForActivity();
+	int attempts = 1;
+	string response;
+
+	while (attempts++ < 10 && response.empty())
+	{
+		sendMessageToSocket(request, server_socket);
+		response = listenForActivity();
+
+		// Validate the response
+		if (!response.empty())
+		{
+			json inputJson;
+			try
+			{
+				inputJson = json::parse(response);
+
+				int code;
+				if (inputJson["code"].is_string())
+					code = stoi(inputJson["code"].get<string>());
+				else if (inputJson["code"].is_number())
+					code = inputJson["code"].get<int>();
+
+				// If the request was invalid, try again
+				if (code == 400)
+				{
+					response = "";
+				}
+			}
+			catch (exception e)
+			{
+				// idk
+				response = "";
+			}
+		}
+	}
+
+	if (attempts >= 10)
+	{
+		perror("System-wide timeout occurred.");
+	}
+
 	return response;
 }
 
@@ -138,8 +193,16 @@ string KVApi::listenForActivity()
 		// Read the incoming message into the buffer
 		int message_size = read(server_socket, buffer, INCOMING_MESSAGE_SIZE);
 
+		// No response
+		if (errno == EWOULDBLOCK)
+		{
+			cout << endl << "Single response timeout." << endl;
+
+			// Return an empty string - this will be flagged for retry
+			return "";
+		}
 		// Read what happened, if anything
-		if (DEBUG_MODE && message_size > 0)
+		else if (DEBUG_MODE && message_size > 0)
 		{
 			json request = json::parse(buffer);
 			cout << "Recieved response: " << request.dump() << endl;
@@ -157,11 +220,12 @@ void KVApi::sendMessageToSocket(string request, int socket) {
     }
 }
 
-string KVApi::createRequestJson(string type, string key, string value) {
+string KVApi::createRequestJson(string type, string key, string value, int version) {
 	json request;
 	request["type"] = type;
 	request["key"] = key;
 	request["value"] = value;
+	request["version"] = version;
 	return request.dump();
 }
 
@@ -187,6 +251,17 @@ bool KVApi::makeConnection(string host, int port)
 		cout << "Error: could not open socket" << endl;
 		return false;
 	}
+
+	// Timeout logic
+	struct timeval timeout;
+	timeout.tv_sec = 1;
+	timeout.tv_usec = 0;
+
+	if (setsockopt (server_socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+		perror("Could not set timeout\r\n");
+
+	if (setsockopt (server_socket, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+		perror("Could not set timeout\r\n");
 
 	// Connect to the server
 	if (connect(server_socket, res->ai_addr, res->ai_addrlen) < 0) 

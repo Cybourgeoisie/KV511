@@ -13,12 +13,12 @@ vector<int> KVServerBack::sockets_to_close;
 
 int KVServerBack::BUFFER_SIZE = 513; // Size given in bytes
 int KVServerBack::INCOMING_MESSAGE_SIZE = KVServerBack::BUFFER_SIZE - 1;
-string KVServerBack::STORAGE_FILE = "storage.txt"; // Storage file name
+string KVServerBack::STORAGE_FILE = "storage.txt"; // Default storage file name
 
 KVServerBack::KVServerBack()
 {
 	// Define the port number to listen through
-	PORT_NUMBER = 56790;
+	PORT_NUMBER = 56790; // DEFAULT - overridden in ::start(int)
 
 	// Define server limits
 	MAX_SESSIONS = 512;
@@ -30,8 +30,16 @@ KVServerBack::KVServerBack()
 	perf_cp = new vector<string>();
 }
 
-void KVServerBack::start()
+void KVServerBack::start(int port)
 {
+	// Set the port
+	PORT_NUMBER = port;
+
+	// Update the filename
+	ostringstream oss;
+	oss << "storage_" << port << ".txt";
+	STORAGE_FILE = oss.str();
+
 	// Open the socket and listen for connections
 	initialize();
 	openSocket();
@@ -411,7 +419,13 @@ bool KVServerBack::handleMessage(int socket_fd)
 			else if (request["value"].is_number())
 				value = to_string(request["value"].get<int>());
 
-			KVResult_t result = KVServerBack::post(key, value);
+			int version;
+			if (request["version"].is_string())
+				version = stoi(request["version"].get<string>());
+			else if (request["version"].is_number())
+				version = request["version"].get<int>();
+
+			KVResult_t result = KVServerBack::post(key, value, version);
 			response = KVServerBack::createResponseJson("POST", result.key, result.value, result.version, result.err);
 		}
 
@@ -474,7 +488,7 @@ KVResult_t KVServerBack::get(string key)
 	return result;
 }
 
-KVResult_t KVServerBack::post(string key, string value)
+KVResult_t KVServerBack::post(string key, string value, int version)
 {
 	KVResult_t result;
 	result.value = value;
@@ -515,8 +529,12 @@ KVResult_t KVServerBack::post(string key, string value)
 				regex e("^([0-9]{1,}) ([0-9]{1,}) (.*)$");
 				if (regex_search(line, m, e))
 				{
-					// Get the version number, add one to it
-					int version = stoi(m.str(2)) + 1;
+					// If the (update) version provided is invalid, get from the file
+					if (version <= 0)
+						version = stoi(m.str(2));
+
+					// Increment to the next version
+					version++;
 
 					// Update the result
 					result.version = version;

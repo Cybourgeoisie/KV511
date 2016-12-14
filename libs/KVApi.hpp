@@ -25,7 +25,7 @@ class KVApi
         void sendMessageToSocket(string, int);
 		string listenForActivity();
 
-        string createRequestJson(string, string, string);
+        string createRequestJson(string, string, string, int);
 
         string send(string);
         KVResult_t parseResponse(string);
@@ -37,7 +37,7 @@ class KVApi
 		// API
 		bool open();
 		KVResult_t get(string);
-		KVResult_t post(string, string);
+		KVResult_t post(string, string, int);
 		bool close();
 };
 

@@ -80,9 +80,10 @@ void KVClientThread::sendRequests()
 					continue; // Can't handle this case
 
 				// Submit the GET or POST request
+				KVResult_t result;
 				if (strcmp(type.c_str(),"GET") == 0)
 				{
-					api->get(key);
+					result = api->get(key);
 				}
 				else if (strcmp(type.c_str(),"POST") == 0)
 				{
@@ -95,7 +96,13 @@ void KVClientThread::sendRequests()
 					else
 						continue; // Can't handle this case
 
-					api->post(key, value);
+					result = api->post(key, value, -1);
+				}
+
+				// If we get a bad result, then... close.
+				if (result.err == 400)
+				{
+					break; // Leave
 				}
 			}
 

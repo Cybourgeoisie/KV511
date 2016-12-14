@@ -57,7 +57,7 @@ public:
 		static bool handleMessage(int);
 
 		// Calls to the backend
-		static KVResult_t callBackend(string, string, string);
+		static KVResult_t callBackend(string, string, string, string, int);
 		static KVResult_t backendGet(string);
 		static KVResult_t backendPost(string, string);
 
@@ -72,6 +72,12 @@ public:
 		// "Constant" values
 		static int BUFFER_SIZE;
 		static int INCOMING_MESSAGE_SIZE;
+
+		// Qurorum Values
+		static vector<KVBackendServer_t> NODE_ADDRESSES;
+		static int NUM_NODES;
+		static int READ_QUORUM;
+		static int WRITE_QUORUM;
 };
 
 #endif

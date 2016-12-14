@@ -51,6 +51,12 @@ typedef struct {
 	string value;
 } KVResult_t;
 
+typedef struct {
+	bool alive;
+	string address;
+	string port;
+} KVBackendServer_t;
+
 class KVCommon
 {
 	public:
