@@ -494,6 +494,7 @@ KVResult_t KVServerBack::post(string key, string value, int version)
 	result.value = value;
 	result.key = key;
 	result.err = 200;
+	result.version = version;
 
 	// Well, C++ requires writing a new file every time we need to update a part of it, so...
 	// See if the key is already in storage
@@ -530,11 +531,11 @@ KVResult_t KVServerBack::post(string key, string value, int version)
 				if (regex_search(line, m, e))
 				{
 					// If the (update) version provided is invalid, get from the file
-					if (version <= 0)
+					if (version < 0)
 						version = stoi(m.str(2));
 
 					// Increment to the next version
-					version++;
+					version += 1;
 
 					// Update the result
 					result.version = version;

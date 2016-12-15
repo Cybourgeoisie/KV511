@@ -30,6 +30,8 @@ bool KVApi::open()
 		return true;
 	}
 
+	::close(server_socket);
+
 	// No connection made
 	return false;
 }
@@ -40,6 +42,7 @@ KVResult_t KVApi::get(string key)
 	string request  = createRequestJson("GET", key, "", -1);
 	string response = send(request);
 
+	cout << endl << "response: " << response << endl;
 	if (response.empty())
 	{
 		KVResult_t bad_result;
@@ -85,7 +88,7 @@ bool KVApi::close()
 string KVApi::send(string request)
 {
 	int attempts = 1;
-	string response;
+	string response = "";
 
 	while (attempts++ < 10 && response.empty())
 	{

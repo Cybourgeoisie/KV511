@@ -1,0 +1,158 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Short Sectioned Assignment
+% LaTeX Template
+% Version 1.0 (5/5/12)
+%
+% This template has been downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% Original author:
+% Frits Wenneker (http://www.howtotex.com)
+%
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND OTHER DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass[paper=a4, fontsize=11pt]{scrartcl} % A4 paper and 11pt font size
+
+\usepackage[T1]{fontenc} % Use 8-bit encoding that has 256 glyphs
+\usepackage{fourier} % Use the Adobe Utopia font for the document - comment this line to return to the LaTeX default
+\usepackage[english]{babel} % English language/hyphenation
+\usepackage{amsmath,amsfonts,amsthm,amssymb} % Math packages
+\usepackage{listings}
+\usepackage{algpseudocode}
+
+\usepackage{lipsum} % Used for inserting dummy 'Lorem ipsum' text into the template
+
+\usepackage{sectsty} % Allows customizing section commands
+\allsectionsfont{\centering \normalfont\scshape} % Make all sections centered, the default font and small caps
+
+\usepackage{fancyhdr} % Custom headers and footers
+\pagestyle{fancyplain} % Makes all pages in the document conform to the custom headers and footers
+\fancyhead{} % No page header - if you want one, create it in the same way as the footers below
+\fancyfoot[L]{} % Empty left footer
+\fancyfoot[C]{} % Empty center footer
+\fancyfoot[R]{\thepage} % Page numbering for right footer
+\renewcommand{\headrulewidth}{0pt} % Remove header underlines
+\renewcommand{\footrulewidth}{0pt} % Remove footer underlines
+\setlength{\headheight}{13.6pt} % Customize the height of the header
+
+\usepackage{pgfgantt}
+
+\numberwithin{equation}{section} % Number equations within sections (i.e. 1.1, 1.2, 2.1, 2.2 instead of 1, 2, 3, 4)
+\numberwithin{figure}{section} % Number figures within sections (i.e. 1.1, 1.2, 2.1, 2.2 instead of 1, 2, 3, 4)
+\numberwithin{table}{section} % Number tables within sections (i.e. 1.1, 1.2, 2.1, 2.2 instead of 1, 2, 3, 4)
+
+\setlength\parindent{0pt} % Removes all indentation from paragraphs - comment this line for an assignment with lots of text
+
+\lstset{ %
+  basicstyle=\footnotesize,        % the size of the fonts that are used for the code
+  breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
+  breaklines=true,                 % sets automatic line breaking
+  escapeinside={\%*}{*)},          % if you want to add LaTeX within your code
+  keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+  numbers=left,                    % where to put the line-numbers; possible values are (none, left, right)
+  numbersep=5pt,                   % how far the line-numbers are from the code
+  showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+  showstringspaces=false,          % underline spaces within strings only
+  tabsize=2	                   % sets default tabsize to 2 spaces
+}
+
+%----------------------------------------------------------------------------------------
+%	TITLE SECTION
+%----------------------------------------------------------------------------------------
+
+\newcommand{\horrule}[1]{\rule{\linewidth}{#1}} % Create horizontal rule command with 1 argument of height
+
+\title{	
+\normalfont \normalsize 
+\horrule{1pt} \\[0.1cm] % Thin bottom top rule
+	\huge KV511 Project 1 Performance Evaluation  \\ % The assignment title
+\horrule{2pt} \\[0.1cm] % Thick bottom horizontal rule
+}
+
+% Author and Date
+\author{Richard Heidorn, Michael Wheatman}
+\date{\normalsize\today} % Today's date or a custom date
+
+% Homework
+\begin{document}
+
+\maketitle % Print the title
+
+%----------------------------------------------------------------------------------------
+
+\section{Overview of the Program}
+
+The client program for KV511 begins as a single, "master" thread which reads in a configuration file and spools up a variable number of "worker" client threads that each send a number of sessions to the server via an API. The client program can currently work in a single mode that can be treated as two types. The first type generates one worker thread and executes a set of 10 sessions, each consisting of 10 random GET and POST requests to the server. The second type generates N worker threads, where N is defined by the configuration file, and each worker executes 10 sets of 10 sessions simultaneously to the server.
+\\
+
+Like the client program, the server program also begins as a single master thread, and as incoming connections arrive from the client, the server handles each request and returns the results to the client. The server can work in two ways: multithreaded, by spooling up a new server worker thread to handle each incoming connection (which is a single session of 10 requests from the client), or asynchronously, by handling each connection in tandem using a single-threaded, non-blocking asynchronous model.
+
+
+\section{Performance Evaluations}
+
+The first round of evaluations were carried out by examining the performance of the single-threaded, asynchronous server versus the multithreaded server. We ran four key performance experiments:
+
+\begin{enumerate}
+	\item Compare the average time to service a single client session between asynchronous and multithreaded servers for both Type 1 (single client thread) and Type 2 (multiple client threads)
+	\item Compare the average time to service all of a client's sessions between asynchronous and multithreaded servers for both Type 1 and Type 2. This is the similar to the prior, but includes inter-session waiting time.
+	\item Compare the average time that the server takes to handle a single socket from open to close (with interleaving / concurrent connections in the case of multiple simultaneous clients)
+	\item Analyze the average time to service a single message on the server side
+\end{enumerate}
+
+The above evaluations were chosen to best draw comparisons between the multithreaded and asynchronous applications in the broadest sense. The major differences between MT and AS methods include:
+
+\begin{enumerate}
+	\item Overhead of thread creation and cleanup (multithreading)
+	\item Overhead of context switching (multithreading)
+	\item Simultaneous servicing (multithreading) v.s. sequential servicing (asynchronous)
+\end{enumerate}
+
+While far more evaluations can be run, we felt that the above best encapsulated the essence of the project. We are looking forward to contributing more advanced and detailed analyses for the latter half of this project.
+
+
+\begin{figure}
+  \centering
+    \includegraphics[width=0.495\textwidth]{../data/images_p1/time_session_serve_client.png}
+    \includegraphics[width=0.495\textwidth]{../data/images_p1/time_total_serve_client.png}
+  \caption{Average times to serve a single client session of 10 requests (left) and the average times to serve all 10 of a client's sessions (right).}
+\end{figure}
+
+\section{Performance Results}
+
+For the first experiment, we found that the average total time to service a single client's session increased linearly as the number of clients increased. Further, we found that the data for a single session or a full suite of sessions was nearly identical in trends (only increased in time by roughly 10, as we perform 10 sessions for each client thread).
+\\
+
+The average time that the server experiences when managing a socket is more telling. When using the asynchronous model, we find that the time to service a socket (the time from opening to closing the socket) is nearly half of the time to service the socket in the multithreaded version. We suspect that this is measuring both the overhead of thread creation and some effect of context switching.
+\\
+
+\begin{figure}
+  \centering
+    \includegraphics[width=0.45\textwidth]{../data/images_p1/time_socket_server.png}
+  \caption{Average times for the server to handle a socket from open to close. Notice that while an asynchronous socket takes less time, the client still experiences roughly the same time for either server.}
+
+  \centering
+    \includegraphics[width=0.45\textwidth]{../data/images_p1/time_message_AS_server.png}
+  \caption{Average times for the server to handle a single message within a session. The data retrieved for the second bar is probably a fluke.}
+\end{figure}
+
+Of particular interest is the slightly less time that multithreading takes for 5 simultaneous clients from a single client - as a result, we would like to explore how the multithreaded server performs for small numbers of simultaneous clients across multiple cores. Further, we note that the total time that the client experiences for both multithreading and asynchronous models remain the same - we believe this has to do with the client's own overheads and context switching, as well as networking latencies and "waiting for a spot to open" on the server.
+\\
+
+Finally, we've included the average time it takes the server to handle a single message using the asynchronous model. This data is rough, as the timing methods may have been too coarse-grained for the fine-grain function call to access the data store. We plan to refine this analysis, as it is a great place to analyze lock contention for the multithreaded server.
+
+
+
+
+
+\end{document}
+
+
+
+

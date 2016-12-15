@@ -573,7 +573,7 @@ KVResult_t KVServer::backendGet(string key)
 {
 	// Keep track of the best result
 	KVResult_t latest_result;
-	latest_result.version = 0;
+	latest_result.version = -1;
 
 	int responses = 0;
 	bool read_nodes[NUM_NODES];
@@ -586,14 +586,11 @@ KVResult_t KVServer::backendGet(string key)
 		if (read_nodes[node])
 			continue; // Only visit nodes once
 
-		// Update the nodes we just read
-		read_nodes[node] = true;
-
 		// Make sure that the node is alive
 		if (NODE_ADDRESSES[node].alive == false)
 		{
 			// Sleep a bit, then give it a try
-			usleep(1000); // 1 ms
+			usleep(10000); // 1 ms
 		}
 
 		// Get the response
@@ -616,6 +613,9 @@ KVResult_t KVServer::backendGet(string key)
 			
 			// Update the responses retrieved
 			responses++;
+
+			// Update the nodes we just read
+			read_nodes[node] = true;
 		}
 	}
 
@@ -627,10 +627,12 @@ KVResult_t KVServer::backendPost(string key, string value)
 	// First things first.. get the most recent version
 	KVResult_t result  = KVServer::backendGet(key);
 	int version_number = result.version;
+	if (version_number < 0)
+		version_number = 0;
 
 	// Keep track of the best result
 	KVResult_t latest_result;
-	latest_result.version = 0;
+	latest_result.version = -1;
 
 	int responses = 0;
 	bool write_nodes[NUM_NODES];
@@ -642,9 +644,6 @@ KVResult_t KVServer::backendPost(string key, string value)
 		int node = (int)(rand() % NUM_NODES);
 		if (write_nodes[node])
 			continue; // Only visit nodes once
-
-		// Update the nodes we just read
-		write_nodes[node] = true;
 
 		// Make sure that the node is alive
 		if (NODE_ADDRESSES[node].alive == false)
@@ -674,6 +673,9 @@ KVResult_t KVServer::backendPost(string key, string value)
 			
 			// Update the responses retrieved
 			responses++;
+
+			// Update the nodes we just read
+			write_nodes[node] = true;
 		}
 	}
 
@@ -713,6 +715,9 @@ KVResult_t KVServer::callBackend(string address, string port, string key, string
 	else
 	{
 		cout << "Could not make a connection";
+
+		// Format the error appropriately
+		result.err = 400;
 	}
 
 	// Need to sleep at least a little bit, otherwise the Async server
