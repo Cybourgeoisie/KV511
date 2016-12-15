@@ -1,0 +1,67 @@
+\documentclass[12pt,letter]{article}
+% poma_style.sty is used to generate the appropriate format
+\usepackage{poma_style}
+% Include any other packages and definitions needed
+\usepackage{graphicx}
+\usepackage{amsmath,amsfonts,bm}
+\usepackage{courier}
+\usepackage{setspace}
+
+\begin{document}
+\onehalfspacing
+\section*{}
+\subsection*{ii: study the trade-off between latency and freshness across configurations offering different levels of weak consistency}
+For (ii) you are to continue using N = 5 but pick two quorum configurations wherein R + W < N . You are to measure average put and get latencies and compare them with corresponding latencies for configurations with strong quorums. You are to also record and report the fraction of get requests that encounter violations of consistency (by which we mean that the get request returns a stale version of the requested key-value pair).
+We chose to analyze read-write sloppy quorums of sizes 2,2 and 1,1. We hypothesized that the fraction of the get request returning stale data would approximate the size of the write quorum compared to the replication size (in nodes). For example, with a write quorum of size 2, we would expect both read nodes to not overlap with either write node 70 percent of the time. With write and read quorums of size 1, the odds of a miss is 80 percent.\\
+
+\onehalfspacing
+In fact, our true rate of stale data was _____ for the 2,2 case, and ______ for the 1,1 case. For the 1,1 case, the average put latency was _____ ms, and the average get latency was ______ ms. For the 2,2 case, the average put latency was _____ ms, and the average get latency was ______ ms. However, its worth noting that the latency calculation does not take into account the overhead associated with determining whether the response to a get was stale. Actually checking this fact messes with the result because you have to actually more nodes to determine if the received value was the newest. 
+
+\subsection*{iii: study the efficacy of your fault tolerance mechanisms}
+When the client loses connection with the server front end, it first attempts to retry by re-sending the data again and then terminates the connection entirely. If necessary, the user accessing the client is able to restart the client and it will reconnect with the server once the server front end comes back online. The timing mechanism comes into effect with regards to specific requests (get or post) and not the connection itself.\\
+
+\onehalfspacing
+When one of the back-end replicas fails for long enough that the server front end notices it's down, the server-front end terminates the connection. Once the replication node comes back on line the server front end will immediately reconnect with the newly recovered node. When the node initially fails, the front end, depending if there are "spare" replication nodes to fill out the quorum, either adds one of the spares to the quorum as necessarily (choosing at random from the spares) or continually retries (with a 10 ms delay) if there are not enough spares to fill out the quorum. There is not an explicit message sent to the client, but because it will receive the 1 and 10 second timeouts, it will know that something is causing delays in the system.
+\end{document}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
