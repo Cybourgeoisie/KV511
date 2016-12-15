@@ -8,10 +8,15 @@
 \usepackage{setspace}
 
 \begin{document}
+study the trade-off between get and put latencies in a strongly consistent configuration
+
 \onehalfspacing
 \section*{}
+\subsection*{i: study the trade-off between get and put latencies in a strongly consistent configuration}
+For (i), you are to set N = 5 and consider all feasible (R, W ) pairs. For each quorum configuration choice, you are to report the average latency of put and get operations. Based on this, you are to come up with recommendations for the quorum parameters to choose based on the following workload features: request arrival rate, ratio of put requests, ratio of get requests.
+We ran all of our testing on multiple AWS instances (accounting for the higher than expected latency). Based on our results, we recommend a read quorum of ____ and a write quorum of ______.\\
+
 \subsection*{ii: study the trade-off between latency and freshness across configurations offering different levels of weak consistency}
-For (ii) you are to continue using N = 5 but pick two quorum configurations wherein R + W < N . You are to measure average put and get latencies and compare them with corresponding latencies for configurations with strong quorums. You are to also record and report the fraction of get requests that encounter violations of consistency (by which we mean that the get request returns a stale version of the requested key-value pair).
 We chose to analyze read-write sloppy quorums of sizes 2,2 and 1,1. We hypothesized that the fraction of the get request returning stale data would approximate the size of the write quorum compared to the replication size (in nodes). For example, with a write quorum of size 2, we would expect both read nodes to not overlap with either write node 70 percent of the time. With write and read quorums of size 1, the odds of a miss is 80 percent.\\
 
 \onehalfspacing
