@@ -1,8 +1,0 @@
-(iii) study the efficacy of your fault tolerance mechanisms.
-Finally, for (iii), you are to induce a failure of one of the back-end replicas lasting a few minutes (longer than the timeouts you are using for detecting failures) and report events concerned with failure handling (detection at front-end, conveyance to the client, and detection of recovery at the front-end).
-
-When the client loses connection with the server front end, it first attempts to retry by resending the data again and then terminates the connection entirely. If necessary, the user accessing the client is able to restart the client and it will reconnect with the server once the server front end comes back online. The timing mechanism comes into effect with regards to specific requests (get or post) and not the connection itself.
-
-When one of the back-end replicas fails for long enough that the server front end notices it's down, the server-front end terminates the connection. Once the replication node comes back on line the server front end will immediatly reconnect with the newly recovered node. When the node initially fails, the front end, depending if there are "spare" replication nodes to fill out the quorum, either adds one of the spares to the quorum as necessarily (choosing at random from the spares) or continually retries (with a 10 ms delay) if there are not enough spares to fill out the quorum. There is not an explicit message sent to the client, but because it will receive the 1 and 10 second timeouts, it will know that something is causing delays in the system.
-
-
